@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pampero SQL</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>Pampero SQL</h1>
+
+      <section class="panel">
+        <label for="platform">Plataforma</label>
+        <select id="platform">
+          <option value="sqlserver">SQL Server</option>
+          <option value="mysql">MySQL</option>
+          <option value="postgresql">PostgreSQL</option>
+        </select>
+
+        <p id="connectionInfo"></p>
+
+        <label for="query">Consulta SQL</label>
+        <textarea id="query" rows="10" placeholder="SELECT * FROM my_table;"></textarea>
+
+        <button id="executeBtn">Ejecutar consulta</button>
+      </section>
+
+      <section class="panel">
+        <h2>Resultado</h2>
+        <p id="meta"></p>
+        <pre id="error" class="error hidden"></pre>
+        <div id="tableWrap"></div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
