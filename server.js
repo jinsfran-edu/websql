@@ -11,6 +11,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 const readOnlyMode = String(process.env.READ_ONLY_MODE || 'true').toLowerCase() !== 'false';
 const sqlServerDiagnosticsEnabled = String(process.env.SQLSERVER_DIAGNOSTICS || 'false').toLowerCase() === 'true';
+const queryTimeoutMs = Math.max(1, toInt(process.env.QUERY_TIMEOUT_MS, 15000));
 
 let sqlServerPoolPromise = null;
 let mysqlPool = null;
@@ -64,6 +65,18 @@ function requireField(name, value) {
   if (!value && value !== 0) {
     throw new Error(`Missing required field: ${name}`);
   }
+}
+
+function isQueryTimeoutError(error) {
+  const code = String(error?.code || '').toUpperCase();
+  const message = String(error?.message || '').toLowerCase();
+  return (
+    code === 'ETIMEOUT'
+    || code === 'PROTOCOL_SEQUENCE_TIMEOUT'
+    || code === '57014'
+    || message.includes('timeout')
+    || message.includes('statement timeout')
+  );
 }
 
 function splitSqlStatements(sql) {
@@ -237,7 +250,9 @@ async function runSqlServerQuery(connection, queryText) {
   const queryToRun = diagnosticsEnabledForQuery ? buildSqlServerDiagnosticsBatch(queryText) : queryText;
 
   const queryStartedAt = nowNs();
-  const result = await pool.request().query(queryToRun);
+  const request = pool.request();
+  request.timeout = queryTimeoutMs;
+  const result = await request.query(queryToRun);
   const queryMs = toFixedMs(elapsedMs(queryStartedAt));
 
   const rows = Array.isArray(result.recordsets) && result.recordsets.length
@@ -271,7 +286,10 @@ async function runMySqlQuery(connection, queryText) {
 
   try {
     const queryStartedAt = nowNs();
-    const [result] = await conn.query(queryText);
+    const [result] = await conn.query({
+      sql: queryText,
+      timeout: queryTimeoutMs
+    });
     const queryMs = toFixedMs(elapsedMs(queryStartedAt));
 
     if (Array.isArray(result)) {
@@ -310,7 +328,10 @@ async function runPostgreSqlQuery(connection, queryText) {
 
   try {
     const queryStartedAt = nowNs();
-    const result = await client.query(queryText);
+    const result = await client.query({
+      text: queryText,
+      query_timeout: queryTimeoutMs
+    });
     const queryMs = toFixedMs(elapsedMs(queryStartedAt));
 
     return {
@@ -337,9 +358,11 @@ async function getSqlServerPool(connection) {
       user: connection.user,
       password: connection.password,
       database: connection.database,
+      connectionTimeout: queryTimeoutMs,
       options: {
         encrypt: connection.encrypt !== false,
-        trustServerCertificate: connection.trustServerCertificate === true
+        trustServerCertificate: connection.trustServerCertificate === true,
+        requestTimeout: queryTimeoutMs
       },
       pool: {
         max: poolMax,
@@ -394,6 +417,7 @@ function getMySqlPool(connection) {
       password: connection.password,
       database: connection.database,
       ssl: connection.ssl ? {} : undefined,
+      connectTimeout: queryTimeoutMs,
       waitForConnections: true,
       connectionLimit: 3,
       maxIdle: 3,
@@ -417,7 +441,10 @@ function getPostgreSqlPool(connection) {
       database: connection.database,
       ssl: useSsl ? { rejectUnauthorized: false } : false,
       max: 3,
-      idleTimeoutMillis: 30000
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: queryTimeoutMs,
+      statement_timeout: queryTimeoutMs,
+      query_timeout: queryTimeoutMs
     });
   }
 
@@ -491,6 +518,12 @@ app.post('/api/query', async (req, res) => {
       ...result
     });
   } catch (error) {
+    if (isQueryTimeoutError(error)) {
+      return res.status(504).json({
+        error: `La consulta supero el timeout configurado (${queryTimeoutMs} ms).`
+      });
+    }
+
     return res.status(500).json({
       error: error.message || 'Unexpected error running query'
     });
@@ -500,7 +533,8 @@ app.post('/api/query', async (req, res) => {
 app.get('/api/settings', (_req, res) => {
   res.json({
     readOnlyMode,
-    sqlServerDiagnosticsEnabled
+    sqlServerDiagnosticsEnabled,
+    queryTimeoutMs
   });
 });
 

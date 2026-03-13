@@ -35,6 +35,7 @@ La app usa únicamente conexiones predeterminadas por plataforma, configuradas p
 
 - `PORT`: puerto HTTP de la app.
 - `READ_ONLY_MODE`: `true` (default) para permitir solo consultas de lectura, `false` para habilitar escritura.
+- `QUERY_TIMEOUT_MS`: timeout global de consultas en milisegundos (default: `15000`).
 - `CORS_ALLOWED_ORIGINS` (opcional): orígenes permitidos separados por coma.
 - `SQLSERVER_HOST`, `SQLSERVER_PORT`, `SQLSERVER_DATABASE`, `SQLSERVER_USER`, `SQLSERVER_PASSWORD`
 - `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_SSL`
