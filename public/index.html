@@ -4,35 +4,64 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pampero SQL</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Sora:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <main class="container">
-      <h1>Pampero SQL</h1>
+      <header class="hero">
+        <p class="eyebrow">Laboratorio de consultas</p>
+        <h1>Pampero SQL</h1>
+        <p class="hero-copy">Ejecuta, compara y valida consultas en SQL Server, MySQL y PostgreSQL desde una sola vista.</p>
+      </header>
 
-      <section class="panel">
-        <label for="platform">Plataforma</label>
-        <select id="platform">
-          <option value="sqlserver">SQL Server</option>
-          <option value="mysql">MySQL</option>
-          <option value="postgresql">PostgreSQL</option>
-        </select>
+      <div class="layout">
+        <section class="panel editor-panel">
+          <div class="field-row">
+            <label for="platform">Plataforma</label>
+            <select id="platform">
+              <option value="sqlserver">SQL Server</option>
+              <option value="mysql">MySQL</option>
+              <option value="postgresql">PostgreSQL</option>
+            </select>
+          </div>
 
-        <p id="connectionInfo"></p>
-  <p id="statusInfo"></p>
+          <div class="badge-row">
+            <p id="connectionInfo" class="badge"></p>
+            <p id="statusInfo" class="badge badge-muted"></p>
+          </div>
 
-        <label for="query">Consulta SQL</label>
-        <textarea id="query" rows="10" placeholder="SELECT * FROM my_table;"></textarea>
+          <div class="query-toolbar">
+            <p>Plantillas:</p>
+            <button class="template-btn" type="button" data-template="current_time">Fecha actual</button>
+            <button class="template-btn" type="button" data-template="tables">Tablas</button>
+            <button class="template-btn" type="button" data-template="columns_count">Conteo columnas</button>
+            <button class="template-btn" type="button" data-template="server_version">Version del servidor</button>
+          </div>
 
-        <button id="executeBtn">Ejecutar consulta</button>
-      </section>
+          <label for="query">Consulta SQL</label>
+          <textarea id="query" rows="11" placeholder="SELECT * FROM my_table;"></textarea>
 
-      <section class="panel">
-        <h2>Resultado</h2>
-        <p id="meta"></p>
-        <pre id="error" class="error hidden"></pre>
-        <div id="tableWrap"></div>
-      </section>
+          <div class="actions-row">
+            <button id="executeBtn">Ejecutar consulta</button>
+            <p class="hint">Atajo: Ctrl/Cmd + Enter</p>
+          </div>
+        </section>
+
+        <section class="panel result-panel">
+          <div class="result-head">
+            <h2>Resultado</h2>
+            <p id="meta" class="meta"></p>
+          </div>
+          <pre id="error" class="error hidden"></pre>
+          <div id="tableWrap" class="table-wrap"></div>
+        </section>
+      </div>
     </main>
 
     <script src="app.js"></script>

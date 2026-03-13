@@ -3,6 +3,7 @@ const connectionInfoEl = document.getElementById('connectionInfo');
 const statusInfoEl = document.getElementById('statusInfo');
 const queryEl = document.getElementById('query');
 const executeBtnEl = document.getElementById('executeBtn');
+const templateBtnEls = document.querySelectorAll('.template-btn');
 const metaEl = document.getElementById('meta');
 const errorEl = document.getElementById('error');
 const tableWrapEl = document.getElementById('tableWrap');
@@ -30,11 +31,41 @@ const defaultConnections = {
   }
 };
 
+const sqlTemplatesByPlatform = {
+  sqlserver: {
+    current_time: 'SELECT GETDATE() AS fecha_hora;',
+    tables: 'SELECT TOP 20 TABLE_SCHEMA, TABLE_NAME FROM INFORMATION_SCHEMA.TABLES ORDER BY TABLE_SCHEMA, TABLE_NAME;',
+    columns_count: 'SELECT COUNT(*) AS total FROM INFORMATION_SCHEMA.COLUMNS;',
+    server_version: 'SELECT @@VERSION AS version_servidor;'
+  },
+  mysql: {
+    current_time: 'SELECT NOW() AS fecha_hora;',
+    tables: 'SELECT TABLE_SCHEMA, TABLE_NAME FROM information_schema.tables ORDER BY TABLE_SCHEMA, TABLE_NAME LIMIT 20;',
+    columns_count: 'SELECT COUNT(*) AS total FROM information_schema.columns;',
+    server_version: 'SELECT VERSION() AS version_servidor;'
+  },
+  postgresql: {
+    current_time: 'SELECT NOW() AS fecha_hora;',
+    tables: "SELECT table_schema, table_name FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog', 'information_schema') ORDER BY table_schema, table_name LIMIT 20;",
+    columns_count: 'SELECT COUNT(*) AS total FROM information_schema.columns;',
+    server_version: 'SELECT pg_catalog.version() AS version_servidor;'
+  }
+};
+
 function splitSqlStatements(sql) {
   return String(sql)
     .split(';')
     .map((statement) => statement.trim())
     .filter(Boolean);
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function renderConnectionInfo() {
@@ -53,6 +84,34 @@ function renderConnectionInfo() {
   } else {
     statusInfoEl.textContent = '';
   }
+
+  renderTemplateButtons();
+}
+
+function resolveTemplateSql(platform, templateName) {
+  const platformTemplates = sqlTemplatesByPlatform[platform];
+  if (!platformTemplates) {
+    return '';
+  }
+
+  return platformTemplates[templateName] || '';
+}
+
+function renderTemplateButtons() {
+  const platform = platformEl.value;
+  templateBtnEls.forEach((button) => {
+    const templateName = button.getAttribute('data-template');
+    const sql = resolveTemplateSql(platform, templateName);
+
+    if (!sql) {
+      button.disabled = true;
+      button.removeAttribute('title');
+      return;
+    }
+
+    button.disabled = false;
+    button.setAttribute('title', sql);
+  });
 }
 
 async function loadSettings() {
@@ -79,14 +138,17 @@ async function loadSettings() {
 
 function renderRows(columns, rows) {
   if (!rows || rows.length === 0) {
-    tableWrapEl.innerHTML = '<p>La consulta no devolvió filas.</p>';
+    tableWrapEl.innerHTML = '<p class="table-empty">La consulta no devolvio filas.</p>';
     return;
   }
 
-  const header = columns.map((column) => `<th>${column}</th>`).join('');
+  const safeColumns = columns.map((column) => escapeHtml(column));
+  const header = safeColumns.map((column) => `<th>${column}</th>`).join('');
   const body = rows
     .map((row) => {
-      const tds = columns.map((column) => `<td>${row[column] ?? ''}</td>`).join('');
+      const tds = columns
+        .map((column) => `<td>${escapeHtml(row[column] == null ? '' : row[column])}</td>`)
+        .join('');
       return `<tr>${tds}</tr>`;
     })
     .join('');
@@ -161,8 +223,35 @@ async function executeQuery() {
   }
 }
 
+function applyTemplateQuery(event) {
+  const templateName = event.currentTarget.getAttribute('data-template');
+  const sql = resolveTemplateSql(platformEl.value, templateName);
+  if (!sql) {
+    return;
+  }
+
+  queryEl.value = sql;
+  queryEl.focus();
+}
+
+function handleQueryShortcuts(event) {
+  const isEnter = event.key === 'Enter';
+  const hasModifier = event.ctrlKey || event.metaKey;
+
+  if (!isEnter || !hasModifier) {
+    return;
+  }
+
+  event.preventDefault();
+  if (!executeBtnEl.disabled) {
+    executeQuery();
+  }
+}
+
 platformEl.addEventListener('change', renderConnectionInfo);
 executeBtnEl.addEventListener('click', executeQuery);
+queryEl.addEventListener('keydown', handleQueryShortcuts);
+templateBtnEls.forEach((button) => button.addEventListener('click', applyTemplateQuery));
 
 renderConnectionInfo();
 loadSettings();
