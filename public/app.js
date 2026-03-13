@@ -1,10 +1,16 @@
 const platformEl = document.getElementById('platform');
 const connectionInfoEl = document.getElementById('connectionInfo');
+const statusInfoEl = document.getElementById('statusInfo');
 const queryEl = document.getElementById('query');
 const executeBtnEl = document.getElementById('executeBtn');
 const metaEl = document.getElementById('meta');
 const errorEl = document.getElementById('error');
 const tableWrapEl = document.getElementById('tableWrap');
+
+let appSettings = {
+  readOnlyMode: null,
+  sqlServerDiagnosticsEnabled: null
+};
 
 const defaultConnections = {
   sqlserver: {
@@ -35,6 +41,40 @@ function renderConnectionInfo() {
   const platform = platformEl.value;
   const info = defaultConnections[platform];
   connectionInfoEl.textContent = `Servidor: ${info.host} | Base: ${info.database} | Usuario: ${info.user}`;
+
+  if (platform === 'sqlserver') {
+    if (appSettings.sqlServerDiagnosticsEnabled === true) {
+      statusInfoEl.textContent = 'Diagnostico SQL Server: activo';
+    } else if (appSettings.sqlServerDiagnosticsEnabled === false) {
+      statusInfoEl.textContent = 'Diagnostico SQL Server: inactivo';
+    } else {
+      statusInfoEl.textContent = 'Diagnostico SQL Server: desconocido';
+    }
+  } else {
+    statusInfoEl.textContent = '';
+  }
+}
+
+async function loadSettings() {
+  try {
+    const response = await fetch('/api/settings');
+    if (!response.ok) {
+      throw new Error('No se pudo leer la configuracion del servidor');
+    }
+
+    const data = await response.json();
+    appSettings = {
+      readOnlyMode: Boolean(data.readOnlyMode),
+      sqlServerDiagnosticsEnabled: Boolean(data.sqlServerDiagnosticsEnabled)
+    };
+  } catch (_error) {
+    appSettings = {
+      readOnlyMode: null,
+      sqlServerDiagnosticsEnabled: null
+    };
+  }
+
+  renderConnectionInfo();
 }
 
 function renderRows(columns, rows) {
@@ -103,6 +143,12 @@ async function executeQuery() {
     if (typeof data.queryMs === 'number') {
       timingParts.push(`Consulta: ${data.queryMs} ms`);
     }
+    if (typeof data.serverExecMs === 'number') {
+      timingParts.push(`Ejecución en servidor: ${data.serverExecMs} ms`);
+    }
+    if (typeof data.transportOverheadMs === 'number') {
+      timingParts.push(`Transporte/driver: ${data.transportOverheadMs} ms`);
+    }
 
     metaEl.textContent = `Plataforma: ${data.platform} | Filas: ${data.rowCount} | ${timingParts.join(' | ')}`;
     renderRows(data.columns || [], data.rows || []);
@@ -119,4 +165,5 @@ platformEl.addEventListener('change', renderConnectionInfo);
 executeBtnEl.addEventListener('click', executeQuery);
 
 renderConnectionInfo();
+loadSettings();
 queryEl.value = 'SELECT 1 AS ok;';

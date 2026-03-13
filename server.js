@@ -10,6 +10,7 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 const readOnlyMode = String(process.env.READ_ONLY_MODE || 'true').toLowerCase() !== 'false';
+const sqlServerDiagnosticsEnabled = String(process.env.SQLSERVER_DIAGNOSTICS || 'false').toLowerCase() === 'true';
 
 let sqlServerPoolPromise = null;
 let mysqlPool = null;
@@ -160,6 +161,33 @@ function isReadOnlyStatement(statement) {
   return ['SELECT', 'WITH', 'SHOW', 'DESCRIBE', 'DESC', 'EXPLAIN'].includes(leading);
 }
 
+function buildSqlServerDiagnosticsBatch(queryText) {
+  return [
+    'SET NOCOUNT ON;',
+    'DECLARE @__websql_diag_start datetime2(7) = SYSUTCDATETIME();',
+    queryText,
+    ';SELECT CAST(DATEDIFF_BIG(MICROSECOND, @__websql_diag_start, SYSUTCDATETIME()) AS bigint) AS __websql_diag_server_elapsed_us__;'
+  ].join('\n');
+}
+
+function getSqlServerServerElapsedMs(recordsets) {
+  if (!Array.isArray(recordsets) || recordsets.length < 2) {
+    return null;
+  }
+
+  const lastRecordset = recordsets[recordsets.length - 1];
+  if (!Array.isArray(lastRecordset) || lastRecordset.length !== 1) {
+    return null;
+  }
+
+  const elapsedUs = Number(lastRecordset[0]?.__websql_diag_server_elapsed_us__);
+  if (!Number.isFinite(elapsedUs) || elapsedUs < 0) {
+    return null;
+  }
+
+  return toFixedMs(elapsedUs / 1000);
+}
+
 function requireEnv(name) {
   const value = process.env[name];
   if (!value) {
@@ -205,14 +233,29 @@ async function runSqlServerQuery(connection, queryText) {
   const pool = await getSqlServerPool(connection);
   const connectMs = toFixedMs(elapsedMs(connectStartedAt));
 
+  const diagnosticsEnabledForQuery = sqlServerDiagnosticsEnabled && isReadOnlyStatement(queryText);
+  const queryToRun = diagnosticsEnabledForQuery ? buildSqlServerDiagnosticsBatch(queryText) : queryText;
+
   const queryStartedAt = nowNs();
-  const result = await pool.request().query(queryText);
+  const result = await pool.request().query(queryToRun);
   const queryMs = toFixedMs(elapsedMs(queryStartedAt));
-  const rows = result.recordset || [];
+
+  const rows = Array.isArray(result.recordsets) && result.recordsets.length
+    ? (result.recordsets[0] || [])
+    : (result.recordset || []);
+
+  const serverExecMs = diagnosticsEnabledForQuery
+    ? getSqlServerServerElapsedMs(result.recordsets)
+    : null;
+  const transportOverheadMs = Number.isFinite(serverExecMs)
+    ? toFixedMs(Math.max(queryMs - serverExecMs, 0))
+    : null;
 
   return {
     connectMs,
     queryMs,
+    serverExecMs,
+    transportOverheadMs,
     columns: rows.length ? Object.keys(rows[0]) : [],
     rows,
     rowCount: rows.length,
@@ -452,6 +495,13 @@ app.post('/api/query', async (req, res) => {
       error: error.message || 'Unexpected error running query'
     });
   }
+});
+
+app.get('/api/settings', (_req, res) => {
+  res.json({
+    readOnlyMode,
+    sqlServerDiagnosticsEnabled
+  });
 });
 
 app.get('/health', (_req, res) => {
