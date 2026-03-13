@@ -1,6 +1,5 @@
 const platformEl = document.getElementById('platform');
 const connectionInfoEl = document.getElementById('connectionInfo');
-const statusInfoEl = document.getElementById('statusInfo');
 const queryEl = document.getElementById('query');
 const executeBtnEl = document.getElementById('executeBtn');
 const templateBtnEls = document.querySelectorAll('.template-btn');
@@ -9,8 +8,7 @@ const errorEl = document.getElementById('error');
 const tableWrapEl = document.getElementById('tableWrap');
 
 let appSettings = {
-  readOnlyMode: null,
-  sqlServerDiagnosticsEnabled: null
+  readOnlyMode: null
 };
 
 const defaultConnections = {
@@ -72,19 +70,6 @@ function renderConnectionInfo() {
   const platform = platformEl.value;
   const info = defaultConnections[platform];
   connectionInfoEl.textContent = `Servidor: ${info.host} | Base: ${info.database} | Usuario: ${info.user}`;
-
-  if (platform === 'sqlserver') {
-    if (appSettings.sqlServerDiagnosticsEnabled === true) {
-      statusInfoEl.textContent = 'Diagnostico SQL Server: activo';
-    } else if (appSettings.sqlServerDiagnosticsEnabled === false) {
-      statusInfoEl.textContent = 'Diagnostico SQL Server: inactivo';
-    } else {
-      statusInfoEl.textContent = 'Diagnostico SQL Server: desconocido';
-    }
-  } else {
-    statusInfoEl.textContent = '';
-  }
-
   renderTemplateButtons();
 }
 
@@ -123,13 +108,11 @@ async function loadSettings() {
 
     const data = await response.json();
     appSettings = {
-      readOnlyMode: Boolean(data.readOnlyMode),
-      sqlServerDiagnosticsEnabled: Boolean(data.sqlServerDiagnosticsEnabled)
+      readOnlyMode: Boolean(data.readOnlyMode)
     };
   } catch (_error) {
     appSettings = {
-      readOnlyMode: null,
-      sqlServerDiagnosticsEnabled: null
+      readOnlyMode: null
     };
   }
 
