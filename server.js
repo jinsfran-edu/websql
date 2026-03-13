@@ -14,6 +14,7 @@ const readOnlyMode = String(process.env.READ_ONLY_MODE || 'true').toLowerCase() 
 let sqlServerPoolPromise = null;
 let mysqlPool = null;
 let postgresPool = null;
+let sqlServerWarmupPromise = null;
 
 const allowedOrigins = String(process.env.CORS_ALLOWED_ORIGINS || '')
   .split(',')
@@ -44,6 +45,18 @@ function normalizePlatform(platform) {
 function toInt(value, fallback) {
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function nowNs() {
+  return process.hrtime.bigint();
+}
+
+function elapsedMs(startNs) {
+  return Number(process.hrtime.bigint() - startNs) / 1e6;
+}
+
+function toFixedMs(value) {
+  return Number(value.toFixed(3));
 }
 
 function requireField(name, value) {
@@ -188,13 +201,13 @@ function getConnectionFromEnv(platform) {
 }
 
 async function runSqlServerQuery(connection, queryText) {
-  const connectStartedAt = Date.now();
+  const connectStartedAt = nowNs();
   const pool = await getSqlServerPool(connection);
-  const connectMs = Date.now() - connectStartedAt;
+  const connectMs = toFixedMs(elapsedMs(connectStartedAt));
 
-  const queryStartedAt = Date.now();
+  const queryStartedAt = nowNs();
   const result = await pool.request().query(queryText);
-  const queryMs = Date.now() - queryStartedAt;
+  const queryMs = toFixedMs(elapsedMs(queryStartedAt));
   const rows = result.recordset || [];
 
   return {
@@ -209,14 +222,14 @@ async function runSqlServerQuery(connection, queryText) {
 
 async function runMySqlQuery(connection, queryText) {
   const pool = getMySqlPool(connection);
-  const connectStartedAt = Date.now();
+  const connectStartedAt = nowNs();
   const conn = await pool.getConnection();
-  const connectMs = Date.now() - connectStartedAt;
+  const connectMs = toFixedMs(elapsedMs(connectStartedAt));
 
   try {
-    const queryStartedAt = Date.now();
+    const queryStartedAt = nowNs();
     const [result] = await conn.query(queryText);
-    const queryMs = Date.now() - queryStartedAt;
+    const queryMs = toFixedMs(elapsedMs(queryStartedAt));
 
     if (Array.isArray(result)) {
       return {
@@ -248,14 +261,14 @@ async function runMySqlQuery(connection, queryText) {
 
 async function runPostgreSqlQuery(connection, queryText) {
   const pool = getPostgreSqlPool(connection);
-  const connectStartedAt = Date.now();
+  const connectStartedAt = nowNs();
   const client = await pool.connect();
-  const connectMs = Date.now() - connectStartedAt;
+  const connectMs = toFixedMs(elapsedMs(connectStartedAt));
 
   try {
-    const queryStartedAt = Date.now();
+    const queryStartedAt = nowNs();
     const result = await client.query(queryText);
-    const queryMs = Date.now() - queryStartedAt;
+    const queryMs = toFixedMs(elapsedMs(queryStartedAt));
 
     return {
       connectMs,
@@ -272,6 +285,9 @@ async function runPostgreSqlQuery(connection, queryText) {
 
 async function getSqlServerPool(connection) {
   if (!sqlServerPoolPromise) {
+    const poolMin = toInt(process.env.SQLSERVER_POOL_MIN, 1);
+    const poolMax = toInt(process.env.SQLSERVER_POOL_MAX, 3);
+
     const config = {
       server: connection.host,
       port: toInt(connection.port, 1433),
@@ -283,8 +299,8 @@ async function getSqlServerPool(connection) {
         trustServerCertificate: connection.trustServerCertificate === true
       },
       pool: {
-        max: 3,
-        min: 0,
+        max: poolMax,
+        min: poolMin,
         idleTimeoutMillis: 30000
       }
     };
@@ -297,6 +313,33 @@ async function getSqlServerPool(connection) {
   }
 
   return sqlServerPoolPromise;
+}
+
+async function warmSqlServerPoolIfEnabled() {
+  const enabled = String(process.env.SQLSERVER_WARMUP_ON_START || 'true').toLowerCase() !== 'false';
+  if (!enabled) {
+    return;
+  }
+
+  if (!sqlServerWarmupPromise) {
+    sqlServerWarmupPromise = (async () => {
+      try {
+        const connection = getConnectionFromEnv('sqlserver');
+        const pool = await getSqlServerPool(connection);
+        const warmupQuery = String(process.env.SQLSERVER_WARMUP_QUERY || 'SELECT 1 AS ok;').trim();
+
+        if (warmupQuery) {
+          await pool.request().query(warmupQuery);
+        }
+
+        console.log('SQL Server pool warm-up completed.');
+      } catch (error) {
+        console.warn(`SQL Server warm-up skipped: ${error.message}`);
+      }
+    })();
+  }
+
+  await sqlServerWarmupPromise;
 }
 
 function getMySqlPool(connection) {
@@ -417,6 +460,7 @@ app.get('/health', (_req, res) => {
 
 app.listen(port, () => {
   console.log(`WebSQL runner listening on port ${port}`);
+  warmSqlServerPoolIfEnabled().catch(() => null);
 });
 
 ['SIGTERM', 'SIGINT'].forEach((signal) => {
