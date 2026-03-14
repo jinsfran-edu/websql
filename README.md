@@ -36,10 +36,26 @@ La app usa únicamente conexiones predeterminadas por plataforma, configuradas p
 - `PORT`: puerto HTTP de la app.
 - `READ_ONLY_MODE`: `true` (default) para permitir solo consultas de lectura, `false` para habilitar escritura.
 - `QUERY_TIMEOUT_MS`: timeout global de consultas en milisegundos (default: `15000`).
+- `QUERY_STATS_LOG_PATH`: ruta del archivo de auditoria estadistica en formato JSONL (default: `logs/query-stats.jsonl`).
 - `CORS_ALLOWED_ORIGINS` (opcional): orígenes permitidos separados por coma.
 - `SQLSERVER_HOST`, `SQLSERVER_PORT`, `SQLSERVER_DATABASE`, `SQLSERVER_USER`, `SQLSERVER_PASSWORD`
 - `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_SSL`
 - `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DATABASE`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_SSL`
+
+## Registro estadistico de consultas
+
+Cada llamada a `POST /api/query` se registra como una linea JSON en `QUERY_STATS_LOG_PATH`.
+
+Campos registrados por evento:
+
+- `timestamp`: fecha/hora UTC ISO 8601.
+- `ip`: IP de origen del request.
+- `platform`: motor objetivo (`sqlserver`, `mysql`, `postgresql`).
+- `query`: texto SQL enviado.
+- `success`: `true`/`false`.
+- `statusCode`: codigo HTTP devuelto.
+- `durationMs`: duracion total backend en milisegundos.
+- `error`: mensaje de error (solo en fallas).
 
 ## Despliegue en Azure App Service
 

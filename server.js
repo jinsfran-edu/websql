@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const fs = require('fs/promises');
+const path = require('path');
 const sqlServer = require('mssql');
 const mysql = require('mysql2/promise');
 const { Pool } = require('pg');
@@ -12,11 +14,15 @@ const port = process.env.PORT || 3000;
 const readOnlyMode = String(process.env.READ_ONLY_MODE || 'true').toLowerCase() !== 'false';
 const sqlServerDiagnosticsEnabled = String(process.env.SQLSERVER_DIAGNOSTICS || 'false').toLowerCase() === 'true';
 const queryTimeoutMs = Math.max(1, toInt(process.env.QUERY_TIMEOUT_MS, 15000));
+const queryStatsLogPath = process.env.QUERY_STATS_LOG_PATH
+  ? path.resolve(process.env.QUERY_STATS_LOG_PATH)
+  : path.join(__dirname, 'logs', 'query-stats.jsonl');
 
 let sqlServerPoolPromise = null;
 let mysqlPool = null;
 let postgresPool = null;
 let sqlServerWarmupPromise = null;
+let queryStatsDirReadyPromise = null;
 
 const allowedOrigins = String(process.env.CORS_ALLOWED_ORIGINS || '')
   .split(',')
@@ -35,6 +41,8 @@ app.use(
 );
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static('public'));
+
+app.set('trust proxy', true);
 
 function normalizePlatform(platform) {
   const value = String(platform || '').trim().toLowerCase();
@@ -59,6 +67,53 @@ function elapsedMs(startNs) {
 
 function toFixedMs(value) {
   return Number(value.toFixed(3));
+}
+
+function normalizeIp(rawIp) {
+  const value = String(rawIp || '').trim();
+  if (!value) {
+    return 'unknown';
+  }
+
+  if (value.startsWith('::ffff:')) {
+    return value.slice(7);
+  }
+
+  if (value === '::1') {
+    return '127.0.0.1';
+  }
+
+  return value;
+}
+
+function getClientIp(req) {
+  const forwardedFor = req.headers['x-forwarded-for'];
+  if (typeof forwardedFor === 'string' && forwardedFor.trim()) {
+    const first = forwardedFor.split(',')[0].trim();
+    if (first) {
+      return normalizeIp(first);
+    }
+  }
+
+  return normalizeIp(req.ip || req.socket?.remoteAddress || '');
+}
+
+function ensureQueryStatsDirReady() {
+  if (!queryStatsDirReadyPromise) {
+    queryStatsDirReadyPromise = fs
+      .mkdir(path.dirname(queryStatsLogPath), { recursive: true })
+      .catch((error) => {
+        queryStatsDirReadyPromise = null;
+        throw error;
+      });
+  }
+
+  return queryStatsDirReadyPromise;
+}
+
+async function appendQueryStat(entry) {
+  await ensureQueryStatsDirReady();
+  await fs.appendFile(queryStatsLogPath, `${JSON.stringify(entry)}\n`, 'utf8');
 }
 
 function requireField(name, value) {
@@ -478,10 +533,13 @@ async function closePools() {
 
 app.post('/api/query', async (req, res) => {
   const startedAt = Date.now();
+  let normalizedPlatform = null;
+  let queryText = '';
 
   try {
     const { platform, query } = req.body || {};
-    const normalizedPlatform = normalizePlatform(platform);
+    normalizedPlatform = normalizePlatform(platform);
+    queryText = String(query || '');
 
     if (!normalizedPlatform) {
       return res.status(400).json({ error: 'Invalid platform. Use SQL Server, MySQL, or PostgreSQL.' });
@@ -510,14 +568,39 @@ app.post('/api/query', async (req, res) => {
       result = await runPostgreSqlQuery(connection, query);
     }
 
+    const durationMs = Date.now() - startedAt;
+    await appendQueryStat({
+      timestamp: new Date().toISOString(),
+      ip: getClientIp(req),
+      platform: normalizedPlatform,
+      query: queryText,
+      success: true,
+      statusCode: 200,
+      durationMs
+    });
+
     return res.json({
       platform: normalizedPlatform,
-      durationMs: Date.now() - startedAt,
+      durationMs,
       connectMs: result.connectMs,
       queryMs: result.queryMs,
       ...result
     });
   } catch (error) {
+    const statusCode = isQueryTimeoutError(error) ? 504 : 500;
+    await appendQueryStat({
+      timestamp: new Date().toISOString(),
+      ip: getClientIp(req),
+      platform: normalizedPlatform || 'unknown',
+      query: queryText,
+      success: false,
+      statusCode,
+      durationMs: Date.now() - startedAt,
+      error: error.message || 'Unexpected error running query'
+    }).catch((logError) => {
+      console.error(`Failed to write query stats log: ${logError.message}`);
+    });
+
     if (isQueryTimeoutError(error)) {
       return res.status(504).json({
         error: `La consulta supero el timeout configurado (${queryTimeoutMs} ms).`
