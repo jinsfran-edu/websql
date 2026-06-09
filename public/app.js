@@ -316,16 +316,29 @@ function renderTemplateButtons() {
   });
 }
 
+const schemaFetchesInFlight = {};
+
 async function prefetchSchema(platform) {
-  if (schemaCache[platform]) return;
-  try {
-    const response = await fetch(`/api/schema?platform=${platform}`);
-    if (response.ok) {
-      schemaCache[platform] = await response.json();
+  if (schemaCache[platform]) return schemaCache[platform];
+  if (schemaFetchesInFlight[platform]) return schemaFetchesInFlight[platform];
+
+  schemaFetchesInFlight[platform] = (async () => {
+    try {
+      const response = await fetch(`/api/schema?platform=${platform}`);
+      if (response.ok) {
+        schemaCache[platform] = await response.json();
+        return schemaCache[platform];
+      }
+    } catch (_e) {
+      // schema completions won't be available; keyword completions still work
+    } finally {
+      // On failure the cache stays empty, so the next call retries
+      delete schemaFetchesInFlight[platform];
     }
-  } catch (_e) {
-    // schema completions won't be available; keyword completions still work
-  }
+    return null;
+  })();
+
+  return schemaFetchesInFlight[platform];
 }
 
 async function loadSettings() {
@@ -485,6 +498,12 @@ function registerCompletionProvider() {
       const KW = monaco.languages.CompletionItemKind;
       const SNIPPET_RULE = monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet;
       const schemaData = schemaCache[platform];
+
+      // If the initial prefetch failed (e.g. cold start right after a deploy),
+      // retry in the background so upcoming completions get the schema.
+      if (!schemaData) {
+        prefetchSchema(platform);
+      }
 
       // Column completions after "alias." or "table."
       const dotMatch = lineText.match(/(\w+)\.\w*$/);
