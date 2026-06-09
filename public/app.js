@@ -1,15 +1,14 @@
 const platformEl = document.getElementById('platform');
 const connectionInfoEl = document.getElementById('connectionInfo');
-const queryEl = document.getElementById('query');
 const executeBtnEl = document.getElementById('executeBtn');
 const templateBtnEls = document.querySelectorAll('.template-btn');
 const metaEl = document.getElementById('meta');
 const errorEl = document.getElementById('error');
 const tableWrapEl = document.getElementById('tableWrap');
 
-let appSettings = {
-  readOnlyMode: null
-};
+let appSettings = { readOnlyMode: null };
+let editor = null;
+const schemaCache = {};
 
 const defaultConnections = {
   sqlserver: {
@@ -50,10 +49,234 @@ const sqlTemplatesByPlatform = {
   }
 };
 
+// Dialect-specific keyword/function lists
+const KEYWORDS = {
+  common: [
+    { label: 'SELECT', detail: 'SQL' }, { label: 'FROM', detail: 'SQL' },
+    { label: 'WHERE', detail: 'SQL' }, { label: 'AND', detail: 'SQL' },
+    { label: 'OR', detail: 'SQL' }, { label: 'NOT', detail: 'SQL' },
+    { label: 'NULL', detail: 'SQL' }, { label: 'IS NULL', detail: 'SQL' },
+    { label: 'IS NOT NULL', detail: 'SQL' }, { label: 'AS', detail: 'SQL' },
+    { label: 'DISTINCT', detail: 'SQL' }, { label: 'IN', detail: 'SQL' },
+    { label: 'NOT IN', detail: 'SQL' }, { label: 'LIKE', detail: 'SQL' },
+    { label: 'BETWEEN', detail: 'SQL' }, { label: 'EXISTS', detail: 'SQL' },
+    { label: 'JOIN', detail: 'SQL' }, { label: 'INNER JOIN', detail: 'SQL' },
+    { label: 'LEFT JOIN', detail: 'SQL' }, { label: 'RIGHT JOIN', detail: 'SQL' },
+    { label: 'FULL OUTER JOIN', detail: 'SQL' }, { label: 'CROSS JOIN', detail: 'SQL' },
+    { label: 'ON', detail: 'SQL' }, { label: 'GROUP BY', detail: 'SQL' },
+    { label: 'ORDER BY', detail: 'SQL' }, { label: 'HAVING', detail: 'SQL' },
+    { label: 'UNION', detail: 'SQL' }, { label: 'UNION ALL', detail: 'SQL' },
+    { label: 'INTERSECT', detail: 'SQL' }, { label: 'EXCEPT', detail: 'SQL' },
+    { label: 'ASC', detail: 'SQL' }, { label: 'DESC', detail: 'SQL' },
+    { label: 'CASE', detail: 'SQL', snippet: 'CASE\n\tWHEN ${1:condicion} THEN ${2:valor}\n\tELSE ${3:valor}\nEND' },
+    { label: 'WHEN', detail: 'SQL' }, { label: 'THEN', detail: 'SQL' },
+    { label: 'ELSE', detail: 'SQL' }, { label: 'END', detail: 'SQL' },
+    { label: 'INSERT INTO', detail: 'SQL' }, { label: 'UPDATE', detail: 'SQL' },
+    { label: 'DELETE FROM', detail: 'SQL' }, { label: 'CREATE TABLE', detail: 'SQL' },
+    { label: 'ALTER TABLE', detail: 'SQL' }, { label: 'DROP TABLE', detail: 'SQL' },
+    { label: 'TRUNCATE TABLE', detail: 'SQL' }, { label: 'BEGIN', detail: 'SQL' },
+    { label: 'COMMIT', detail: 'SQL' }, { label: 'ROLLBACK', detail: 'SQL' },
+    // Aggregate functions
+    { label: 'COUNT', detail: 'función', snippet: 'COUNT(${1:*})' },
+    { label: 'SUM', detail: 'función', snippet: 'SUM(${1:columna})' },
+    { label: 'AVG', detail: 'función', snippet: 'AVG(${1:columna})' },
+    { label: 'MIN', detail: 'función', snippet: 'MIN(${1:columna})' },
+    { label: 'MAX', detail: 'función', snippet: 'MAX(${1:columna})' },
+    { label: 'COALESCE', detail: 'función', snippet: 'COALESCE(${1:expr}, ${2:alternativa})' },
+    { label: 'NULLIF', detail: 'función', snippet: 'NULLIF(${1:expr1}, ${2:expr2})' },
+    { label: 'CAST', detail: 'función', snippet: 'CAST(${1:expr} AS ${2:tipo})' },
+    // Window functions
+    { label: 'ROW_NUMBER', detail: 'ventana', snippet: 'ROW_NUMBER() OVER (${1:ORDER BY columna})' },
+    { label: 'RANK', detail: 'ventana', snippet: 'RANK() OVER (${1:ORDER BY columna})' },
+    { label: 'DENSE_RANK', detail: 'ventana', snippet: 'DENSE_RANK() OVER (${1:ORDER BY columna})' },
+    { label: 'OVER', detail: 'SQL' }, { label: 'PARTITION BY', detail: 'SQL' },
+    { label: 'LAG', detail: 'ventana', snippet: 'LAG(${1:columna}, ${2:1}) OVER (${3:ORDER BY columna})' },
+    { label: 'LEAD', detail: 'ventana', snippet: 'LEAD(${1:columna}, ${2:1}) OVER (${3:ORDER BY columna})' },
+  ],
+  sqlserver: [
+    { label: 'TOP', detail: 'SQL Server', snippet: 'TOP (${1:n})' },
+    { label: 'NOLOCK', detail: 'SQL Server hint' },
+    { label: 'WITH (NOLOCK)', detail: 'SQL Server hint' },
+    { label: 'OUTPUT', detail: 'SQL Server' },
+    { label: 'OPTION (RECOMPILE)', detail: 'SQL Server hint' },
+    { label: 'MERGE', detail: 'SQL Server' },
+    // Date functions
+    { label: 'GETDATE', detail: 'SQL Server · fecha actual', snippet: 'GETDATE()' },
+    { label: 'GETUTCDATE', detail: 'SQL Server · fecha UTC', snippet: 'GETUTCDATE()' },
+    { label: 'SYSDATETIME', detail: 'SQL Server · fecha de alta precisión', snippet: 'SYSDATETIME()' },
+    { label: 'DATEADD', detail: 'SQL Server', snippet: 'DATEADD(${1:day}, ${2:n}, ${3:fecha})' },
+    { label: 'DATEDIFF', detail: 'SQL Server', snippet: 'DATEDIFF(${1:day}, ${2:inicio}, ${3:fin})' },
+    { label: 'DATENAME', detail: 'SQL Server', snippet: 'DATENAME(${1:part}, ${2:fecha})' },
+    { label: 'DATEPART', detail: 'SQL Server', snippet: 'DATEPART(${1:part}, ${2:fecha})' },
+    { label: 'FORMAT', detail: 'SQL Server', snippet: "FORMAT(${1:valor}, '${2:formato}')" },
+    // String/conversion
+    { label: 'ISNULL', detail: 'SQL Server', snippet: 'ISNULL(${1:expr}, ${2:alternativa})' },
+    { label: 'CONVERT', detail: 'SQL Server', snippet: 'CONVERT(${1:tipo}, ${2:expr})' },
+    { label: 'TRY_CAST', detail: 'SQL Server', snippet: 'TRY_CAST(${1:expr} AS ${2:tipo})' },
+    { label: 'TRY_CONVERT', detail: 'SQL Server', snippet: 'TRY_CONVERT(${1:tipo}, ${2:expr})' },
+    { label: 'IIF', detail: 'SQL Server', snippet: 'IIF(${1:condicion}, ${2:verdadero}, ${3:falso})' },
+    { label: 'CHOOSE', detail: 'SQL Server', snippet: 'CHOOSE(${1:indice}, ${2:val1}, ${3:val2})' },
+    { label: 'STRING_AGG', detail: 'SQL Server 2017+', snippet: "STRING_AGG(${1:columna}, '${2:,}')" },
+    { label: 'TRIM', detail: 'función', snippet: 'TRIM(${1:expr})' },
+    { label: 'LEN', detail: 'SQL Server', snippet: 'LEN(${1:expr})' },
+    { label: 'SUBSTRING', detail: 'SQL Server', snippet: 'SUBSTRING(${1:expr}, ${2:inicio}, ${3:largo})' },
+    { label: 'REPLACE', detail: 'función', snippet: 'REPLACE(${1:expr}, ${2:buscar}, ${3:reemplazar})' },
+    { label: 'UPPER', detail: 'función', snippet: 'UPPER(${1:expr})' },
+    { label: 'LOWER', detail: 'función', snippet: 'LOWER(${1:expr})' },
+    // System variables
+    { label: '@@VERSION', detail: 'SQL Server · versión del motor' },
+    { label: '@@ROWCOUNT', detail: 'SQL Server · filas afectadas' },
+    { label: '@@ERROR', detail: 'SQL Server · último error' },
+    { label: '@@IDENTITY', detail: 'SQL Server · último identity' },
+    { label: '@@SPID', detail: 'SQL Server · session ID' },
+    // System objects
+    { label: 'sys.tables', detail: 'SQL Server · tablas' },
+    { label: 'sys.columns', detail: 'SQL Server · columnas' },
+    { label: 'sys.objects', detail: 'SQL Server · objetos' },
+    { label: 'sys.indexes', detail: 'SQL Server · índices' },
+    { label: 'sys.schemas', detail: 'SQL Server · esquemas' },
+    { label: 'INFORMATION_SCHEMA.TABLES', detail: 'SQL Server / estándar' },
+    { label: 'INFORMATION_SCHEMA.COLUMNS', detail: 'SQL Server / estándar' },
+    // Types
+    { label: 'NVARCHAR', detail: 'tipo SQL Server', snippet: 'NVARCHAR(${1:255})' },
+    { label: 'VARCHAR', detail: 'tipo', snippet: 'VARCHAR(${1:255})' },
+    { label: 'DATETIME2', detail: 'tipo SQL Server' },
+    { label: 'DATETIMEOFFSET', detail: 'tipo SQL Server' },
+    { label: 'UNIQUEIDENTIFIER', detail: 'tipo SQL Server (GUID)' },
+    { label: 'MONEY', detail: 'tipo SQL Server' },
+    { label: 'BIT', detail: 'tipo SQL Server' },
+    { label: 'INT', detail: 'tipo' }, { label: 'BIGINT', detail: 'tipo' },
+    { label: 'SMALLINT', detail: 'tipo' }, { label: 'TINYINT', detail: 'tipo' },
+    { label: 'DECIMAL', detail: 'tipo', snippet: 'DECIMAL(${1:18},${2:2})' },
+    { label: 'FLOAT', detail: 'tipo' }, { label: 'REAL', detail: 'tipo' },
+  ],
+  mysql: [
+    { label: 'LIMIT', detail: 'MySQL', snippet: 'LIMIT ${1:10}' },
+    { label: 'OFFSET', detail: 'MySQL', snippet: 'OFFSET ${1:0}' },
+    { label: 'ON DUPLICATE KEY UPDATE', detail: 'MySQL' },
+    { label: 'REPLACE INTO', detail: 'MySQL' },
+    { label: 'SHOW TABLES', detail: 'MySQL' },
+    { label: 'SHOW DATABASES', detail: 'MySQL' },
+    { label: 'SHOW COLUMNS FROM', detail: 'MySQL', snippet: 'SHOW COLUMNS FROM ${1:tabla}' },
+    { label: 'DESCRIBE', detail: 'MySQL', snippet: 'DESCRIBE ${1:tabla}' },
+    // Date functions
+    { label: 'NOW', detail: 'MySQL · fecha y hora actual', snippet: 'NOW()' },
+    { label: 'CURDATE', detail: 'MySQL · fecha actual', snippet: 'CURDATE()' },
+    { label: 'CURTIME', detail: 'MySQL · hora actual', snippet: 'CURTIME()' },
+    { label: 'DATE_FORMAT', detail: 'MySQL', snippet: "DATE_FORMAT(${1:fecha}, '${2:%Y-%m-%d}')" },
+    { label: 'DATE_ADD', detail: 'MySQL', snippet: 'DATE_ADD(${1:fecha}, INTERVAL ${2:1} ${3:DAY})' },
+    { label: 'DATE_SUB', detail: 'MySQL', snippet: 'DATE_SUB(${1:fecha}, INTERVAL ${2:1} ${3:DAY})' },
+    { label: 'DATEDIFF', detail: 'MySQL', snippet: 'DATEDIFF(${1:fecha1}, ${2:fecha2})' },
+    { label: 'UNIX_TIMESTAMP', detail: 'MySQL', snippet: 'UNIX_TIMESTAMP(${1:fecha})' },
+    { label: 'FROM_UNIXTIME', detail: 'MySQL', snippet: 'FROM_UNIXTIME(${1:timestamp})' },
+    { label: 'STR_TO_DATE', detail: 'MySQL', snippet: "STR_TO_DATE('${1:texto}', '${2:%Y-%m-%d}')" },
+    // String/conditional
+    { label: 'IFNULL', detail: 'MySQL', snippet: 'IFNULL(${1:expr}, ${2:alternativa})' },
+    { label: 'IF', detail: 'MySQL', snippet: 'IF(${1:condicion}, ${2:verdadero}, ${3:falso})' },
+    { label: 'CONCAT', detail: 'MySQL', snippet: 'CONCAT(${1:expr1}, ${2:expr2})' },
+    { label: 'GROUP_CONCAT', detail: 'MySQL', snippet: "GROUP_CONCAT(${1:columna} SEPARATOR '${2:,}')" },
+    { label: 'LENGTH', detail: 'MySQL', snippet: 'LENGTH(${1:expr})' },
+    { label: 'CHAR_LENGTH', detail: 'MySQL', snippet: 'CHAR_LENGTH(${1:expr})' },
+    { label: 'SUBSTRING', detail: 'MySQL', snippet: 'SUBSTRING(${1:expr}, ${2:inicio}, ${3:largo})' },
+    { label: 'REPLACE', detail: 'función', snippet: 'REPLACE(${1:expr}, ${2:buscar}, ${3:reemplazar})' },
+    { label: 'UPPER', detail: 'función', snippet: 'UPPER(${1:expr})' },
+    { label: 'LOWER', detail: 'función', snippet: 'LOWER(${1:expr})' },
+    { label: 'TRIM', detail: 'función', snippet: 'TRIM(${1:expr})' },
+    { label: 'VERSION', detail: 'MySQL · versión del motor', snippet: 'VERSION()' },
+    // System
+    { label: 'information_schema.tables', detail: 'MySQL · catálogo de tablas' },
+    { label: 'information_schema.columns', detail: 'MySQL · catálogo de columnas' },
+    // Types
+    { label: 'INT', detail: 'tipo' }, { label: 'BIGINT', detail: 'tipo' },
+    { label: 'TINYINT', detail: 'tipo' }, { label: 'SMALLINT', detail: 'tipo' },
+    { label: 'MEDIUMINT', detail: 'tipo' },
+    { label: 'VARCHAR', detail: 'tipo', snippet: 'VARCHAR(${1:255})' },
+    { label: 'TEXT', detail: 'tipo' }, { label: 'MEDIUMTEXT', detail: 'tipo' },
+    { label: 'LONGTEXT', detail: 'tipo' }, { label: 'TINYTEXT', detail: 'tipo' },
+    { label: 'DATETIME', detail: 'tipo' }, { label: 'TIMESTAMP', detail: 'tipo' },
+    { label: 'DATE', detail: 'tipo' }, { label: 'TIME', detail: 'tipo' },
+    { label: 'FLOAT', detail: 'tipo' }, { label: 'DOUBLE', detail: 'tipo' },
+    { label: 'DECIMAL', detail: 'tipo', snippet: 'DECIMAL(${1:10},${2:2})' },
+    { label: 'ENUM', detail: 'tipo MySQL', snippet: "ENUM('${1:val1}', '${2:val2}')" },
+    { label: 'AUTO_INCREMENT', detail: 'MySQL · autoincremento' },
+  ],
+  postgresql: [
+    { label: 'LIMIT', detail: 'PostgreSQL', snippet: 'LIMIT ${1:10}' },
+    { label: 'OFFSET', detail: 'PostgreSQL', snippet: 'OFFSET ${1:0}' },
+    { label: 'RETURNING', detail: 'PostgreSQL' },
+    { label: 'ON CONFLICT', detail: 'PostgreSQL (upsert)', snippet: 'ON CONFLICT (${1:columna}) DO UPDATE SET ${2:col} = EXCLUDED.${2:col}' },
+    { label: 'ON CONFLICT DO NOTHING', detail: 'PostgreSQL' },
+    { label: 'DISTINCT ON', detail: 'PostgreSQL', snippet: 'DISTINCT ON (${1:columna})' },
+    { label: 'ILIKE', detail: 'PostgreSQL · LIKE sin distinción may/min' },
+    { label: 'SIMILAR TO', detail: 'PostgreSQL · regex SQL' },
+    { label: 'ANY', detail: 'PostgreSQL', snippet: 'ANY(${1:array})' },
+    { label: 'ALL', detail: 'PostgreSQL', snippet: 'ALL(${1:array})' },
+    { label: 'FILTER', detail: 'PostgreSQL · filtro de agregado', snippet: 'FILTER (WHERE ${1:condicion})' },
+    // Date functions
+    { label: 'NOW', detail: 'PostgreSQL · fecha y hora actual', snippet: 'NOW()' },
+    { label: 'CURRENT_DATE', detail: 'PostgreSQL · fecha actual' },
+    { label: 'CURRENT_TIME', detail: 'PostgreSQL · hora actual' },
+    { label: 'CURRENT_TIMESTAMP', detail: 'PostgreSQL · fecha y hora actual' },
+    { label: 'DATE_TRUNC', detail: 'PostgreSQL', snippet: "DATE_TRUNC('${1:day}', ${2:fecha})" },
+    { label: 'DATE_PART', detail: 'PostgreSQL', snippet: "DATE_PART('${1:year}', ${2:fecha})" },
+    { label: 'EXTRACT', detail: 'PostgreSQL', snippet: 'EXTRACT(${1:year} FROM ${2:fecha})' },
+    { label: 'AGE', detail: 'PostgreSQL', snippet: 'AGE(${1:timestamp}, ${2:timestamp})' },
+    { label: 'TO_DATE', detail: 'PostgreSQL', snippet: "TO_DATE('${1:texto}', '${2:YYYY-MM-DD}')" },
+    { label: 'TO_TIMESTAMP', detail: 'PostgreSQL', snippet: "TO_TIMESTAMP('${1:texto}', '${2:formato}')" },
+    // Aggregate / array
+    { label: 'ARRAY_AGG', detail: 'PostgreSQL', snippet: 'ARRAY_AGG(${1:columna})' },
+    { label: 'STRING_AGG', detail: 'PostgreSQL', snippet: "STRING_AGG(${1:columna}, '${2:,}')" },
+    { label: 'JSON_AGG', detail: 'PostgreSQL', snippet: 'JSON_AGG(${1:expr})' },
+    { label: 'JSONB_AGG', detail: 'PostgreSQL', snippet: 'JSONB_AGG(${1:expr})' },
+    { label: 'JSON_BUILD_OBJECT', detail: 'PostgreSQL', snippet: "JSON_BUILD_OBJECT('${1:clave}', ${2:valor})" },
+    { label: 'GENERATE_SERIES', detail: 'PostgreSQL', snippet: 'GENERATE_SERIES(${1:inicio}, ${2:fin}, ${3:paso})' },
+    { label: 'UNNEST', detail: 'PostgreSQL', snippet: 'UNNEST(${1:array})' },
+    // String
+    { label: 'CONCAT', detail: 'función', snippet: 'CONCAT(${1:expr1}, ${2:expr2})' },
+    { label: 'LENGTH', detail: 'función', snippet: 'LENGTH(${1:expr})' },
+    { label: 'SUBSTRING', detail: 'función', snippet: 'SUBSTRING(${1:expr} FROM ${2:inicio} FOR ${3:largo})' },
+    { label: 'REPLACE', detail: 'función', snippet: 'REPLACE(${1:expr}, ${2:buscar}, ${3:reemplazar})' },
+    { label: 'UPPER', detail: 'función', snippet: 'UPPER(${1:expr})' },
+    { label: 'LOWER', detail: 'función', snippet: 'LOWER(${1:expr})' },
+    { label: 'TRIM', detail: 'función', snippet: 'TRIM(${1:expr})' },
+    { label: 'REGEXP_REPLACE', detail: 'PostgreSQL', snippet: "REGEXP_REPLACE(${1:expr}, '${2:patron}', '${3:reemplazo}')" },
+    // System
+    { label: 'pg_catalog.version', detail: 'PostgreSQL · versión', snippet: 'pg_catalog.version()' },
+    { label: 'information_schema.tables', detail: 'PostgreSQL · catálogo de tablas' },
+    { label: 'information_schema.columns', detail: 'PostgreSQL · catálogo de columnas' },
+    { label: 'pg_catalog.pg_tables', detail: 'PostgreSQL · tablas del catálogo' },
+    { label: 'pg_stat_user_tables', detail: 'PostgreSQL · estadísticas de tablas' },
+    // Types
+    { label: 'INTEGER', detail: 'tipo' }, { label: 'BIGINT', detail: 'tipo' },
+    { label: 'SMALLINT', detail: 'tipo' },
+    { label: 'SERIAL', detail: 'tipo PostgreSQL · autoincremento' },
+    { label: 'BIGSERIAL', detail: 'tipo PostgreSQL · autoincremento grande' },
+    { label: 'TEXT', detail: 'tipo PostgreSQL' },
+    { label: 'VARCHAR', detail: 'tipo', snippet: 'VARCHAR(${1:255})' },
+    { label: 'BOOLEAN', detail: 'tipo PostgreSQL' },
+    { label: 'BYTEA', detail: 'tipo PostgreSQL · binario' },
+    { label: 'JSONB', detail: 'tipo PostgreSQL · JSON binario' },
+    { label: 'JSON', detail: 'tipo PostgreSQL' },
+    { label: 'UUID', detail: 'tipo PostgreSQL' },
+    { label: 'INET', detail: 'tipo PostgreSQL · dirección IP' },
+    { label: 'INTERVAL', detail: 'tipo PostgreSQL' },
+    { label: 'NUMERIC', detail: 'tipo', snippet: 'NUMERIC(${1:10},${2:2})' },
+    { label: 'REAL', detail: 'tipo' }, { label: 'FLOAT', detail: 'tipo' },
+    { label: 'DOUBLE PRECISION', detail: 'tipo PostgreSQL' },
+    { label: 'TIMESTAMP', detail: 'tipo' },
+    { label: 'TIMESTAMP WITH TIME ZONE', detail: 'tipo PostgreSQL' },
+    { label: 'DATE', detail: 'tipo' }, { label: 'TIME', detail: 'tipo' },
+  ]
+};
+
+function getKeywordsForPlatform(platform) {
+  return [...KEYWORDS.common, ...(KEYWORDS[platform] || [])];
+}
+
 function splitSqlStatements(sql) {
   return String(sql)
     .split(';')
-    .map((statement) => statement.trim())
+    .map((s) => s.trim())
     .filter(Boolean);
 }
 
@@ -71,15 +294,11 @@ function renderConnectionInfo() {
   const info = defaultConnections[platform];
   connectionInfoEl.textContent = `Servidor: ${info.host} | Base: ${info.database} | Usuario: ${info.user}`;
   renderTemplateButtons();
+  prefetchSchema(platform);
 }
 
 function resolveTemplateSql(platform, templateName) {
-  const platformTemplates = sqlTemplatesByPlatform[platform];
-  if (!platformTemplates) {
-    return '';
-  }
-
-  return platformTemplates[templateName] || '';
+  return (sqlTemplatesByPlatform[platform] || {})[templateName] || '';
 }
 
 function renderTemplateButtons() {
@@ -87,35 +306,37 @@ function renderTemplateButtons() {
   templateBtnEls.forEach((button) => {
     const templateName = button.getAttribute('data-template');
     const sql = resolveTemplateSql(platform, templateName);
-
     if (!sql) {
       button.disabled = true;
       button.removeAttribute('title');
-      return;
+    } else {
+      button.disabled = false;
+      button.setAttribute('title', sql);
     }
-
-    button.disabled = false;
-    button.setAttribute('title', sql);
   });
+}
+
+async function prefetchSchema(platform) {
+  if (schemaCache[platform]) return;
+  try {
+    const response = await fetch(`/api/schema?platform=${platform}`);
+    if (response.ok) {
+      schemaCache[platform] = await response.json();
+    }
+  } catch (_e) {
+    // schema completions won't be available; keyword completions still work
+  }
 }
 
 async function loadSettings() {
   try {
     const response = await fetch('/api/settings');
-    if (!response.ok) {
-      throw new Error('No se pudo leer la configuracion del servidor');
-    }
-
+    if (!response.ok) throw new Error('No se pudo leer la configuracion del servidor');
     const data = await response.json();
-    appSettings = {
-      readOnlyMode: Boolean(data.readOnlyMode)
-    };
+    appSettings = { readOnlyMode: Boolean(data.readOnlyMode) };
   } catch (_error) {
-    appSettings = {
-      readOnlyMode: null
-    };
+    appSettings = { readOnlyMode: null };
   }
-
   renderConnectionInfo();
 }
 
@@ -124,24 +345,15 @@ function renderRows(columns, rows) {
     tableWrapEl.innerHTML = '<p class="table-empty">La consulta no devolvio filas.</p>';
     return;
   }
-
-  const safeColumns = columns.map((column) => escapeHtml(column));
-  const header = safeColumns.map((column) => `<th>${column}</th>`).join('');
+  const safeColumns = columns.map(escapeHtml);
+  const header = safeColumns.map((c) => `<th>${c}</th>`).join('');
   const body = rows
     .map((row) => {
-      const tds = columns
-        .map((column) => `<td>${escapeHtml(row[column] == null ? '' : row[column])}</td>`)
-        .join('');
+      const tds = columns.map((c) => `<td>${escapeHtml(row[c] == null ? '' : row[c])}</td>`).join('');
       return `<tr>${tds}</tr>`;
     })
     .join('');
-
-  tableWrapEl.innerHTML = `
-    <table>
-      <thead><tr>${header}</tr></thead>
-      <tbody>${body}</tbody>
-    </table>
-  `;
+  tableWrapEl.innerHTML = `<table><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
 function clearState() {
@@ -157,43 +369,27 @@ async function executeQuery() {
   executeBtnEl.textContent = 'Ejecutando...';
 
   try {
-    const statements = splitSqlStatements(queryEl.value);
+    const queryText = editor ? editor.getValue() : '';
+    const statements = splitSqlStatements(queryText);
     if (statements.length !== 1) {
       throw new Error('Solo se permite ejecutar una consulta por vez.');
     }
 
-    const payload = {
-      platform: platformEl.value,
-      query: queryEl.value
-    };
-
+    const payload = { platform: platformEl.value, query: queryText };
     const response = await fetch('/api/query', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
 
     const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || 'No se pudo ejecutar la consulta');
-    }
+    if (!response.ok) throw new Error(data.error || 'No se pudo ejecutar la consulta');
 
     const timingParts = [`Tiempo total: ${data.durationMs} ms`];
-    if (typeof data.connectMs === 'number') {
-      timingParts.push(`Conexión: ${data.connectMs} ms`);
-    }
-    if (typeof data.queryMs === 'number') {
-      timingParts.push(`Consulta: ${data.queryMs} ms`);
-    }
-    if (typeof data.serverExecMs === 'number') {
-      timingParts.push(`Ejecución en servidor: ${data.serverExecMs} ms`);
-    }
-    if (typeof data.transportOverheadMs === 'number') {
-      timingParts.push(`Transporte/driver: ${data.transportOverheadMs} ms`);
-    }
+    if (typeof data.connectMs === 'number') timingParts.push(`Conexión: ${data.connectMs} ms`);
+    if (typeof data.queryMs === 'number') timingParts.push(`Consulta: ${data.queryMs} ms`);
+    if (typeof data.serverExecMs === 'number') timingParts.push(`Ejecución en servidor: ${data.serverExecMs} ms`);
+    if (typeof data.transportOverheadMs === 'number') timingParts.push(`Transporte/driver: ${data.transportOverheadMs} ms`);
 
     metaEl.textContent = `Plataforma: ${data.platform} | Filas: ${data.rowCount} | ${timingParts.join(' | ')}`;
     renderRows(data.columns || [], data.rows || []);
@@ -207,35 +403,208 @@ async function executeQuery() {
 }
 
 function applyTemplateQuery(event) {
-  const templateName = event.currentTarget.getAttribute('data-template');
-  const sql = resolveTemplateSql(platformEl.value, templateName);
-  if (!sql) {
-    return;
-  }
-
-  queryEl.value = sql;
-  queryEl.focus();
+  const sql = resolveTemplateSql(platformEl.value, event.currentTarget.getAttribute('data-template'));
+  if (!sql || !editor) return;
+  editor.setValue(sql);
+  editor.focus();
 }
 
-function handleQueryShortcuts(event) {
-  const isEnter = event.key === 'Enter';
-  const hasModifier = event.ctrlKey || event.metaKey;
+// Reserved words that need quoting when used as identifiers (common subset).
+const SQL_RESERVED = new Set([
+  'select','from','where','join','on','group','order','by','having','distinct',
+  'as','and','or','not','null','in','like','between','exists','case','when',
+  'then','else','end','union','all','insert','update','delete','create','alter',
+  'drop','table','index','view','into','set','values','with','over','partition',
+  'rows','range','unbounded','preceding','following','current','row','top',
+  'limit','offset','returning','merge','output','except','intersect','key',
+  'primary','foreign','references','default','check','unique','constraint',
+  'database','schema','column','columns','trigger','procedure','function',
+  'begin','commit','rollback','transaction','declare','cursor','open','fetch',
+  'close','deallocate','exec','execute','if','else','while','return','cast',
+  'convert','coalesce','nullif','isnull','count','sum','avg','min','max',
+  'user','name','date','time','year','month','day','hour','minute','second',
+  'status','type','value','values','level','position','length','replace',
+  'read','write','global','local','identity','password','role','grant','revoke',
+]);
 
-  if (!isEnter || !hasModifier) {
-    return;
+function needsQuoting(name) {
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) return true;
+  return SQL_RESERVED.has(name.toLowerCase());
+}
+
+function quoteIdentifier(name, platform) {
+  if (!needsQuoting(name)) return name;
+  if (platform === 'mysql') return '`' + name + '`';
+  if (platform === 'postgresql') return '"' + name + '"';
+  return '[' + name + ']'; // sqlserver (and fallback)
+}
+
+// Extracts tables and aliases referenced in FROM/JOIN clauses.
+// Returns a Map: lowercase(alias or name) -> canonical table name in the schema.
+function extractTablesInScope(sql, schemaTables) {
+  const tablesByLower = new Map();
+  if (schemaTables) {
+    for (const t of schemaTables) tablesByLower.set(t.name.toLowerCase(), t);
   }
 
-  event.preventDefault();
-  if (!executeBtnEl.disabled) {
-    executeQuery();
+  const result = new Map(); // key: alias/name lowercased, value: schema table object
+  const pattern = /(?:FROM|JOIN)\s+([\w.\[\]"`]+)(?:\s+(?:AS\s+)?([\w]+))?/gi;
+  let match;
+  while ((match = pattern.exec(sql)) !== null) {
+    const rawName = match[1].replace(/[`"[\]]/g, '').split('.').pop();
+    const alias = match[2] ? match[2].replace(/[`"[\]]/g, '') : null;
+    const tableObj = tablesByLower.get(rawName.toLowerCase());
+    if (tableObj) {
+      result.set(rawName.toLowerCase(), tableObj);
+      if (alias) result.set(alias.toLowerCase(), tableObj);
+    }
   }
+  return result;
+}
+
+function registerCompletionProvider() {
+  monaco.languages.registerCompletionItemProvider('sql', {
+    triggerCharacters: [' ', '.', '('],
+    provideCompletionItems(model, position) {
+      const platform = platformEl.value;
+      const wordInfo = model.getWordUntilPosition(position);
+      const range = {
+        startLineNumber: position.lineNumber,
+        endLineNumber: position.lineNumber,
+        startColumn: wordInfo.startColumn,
+        endColumn: wordInfo.endColumn
+      };
+
+      const lineText = model.getValueInRange({
+        startLineNumber: position.lineNumber, startColumn: 1,
+        endLineNumber: position.lineNumber, endColumn: position.column
+      });
+
+      const fullSql = model.getValue();
+      const suggestions = [];
+      const KW = monaco.languages.CompletionItemKind;
+      const SNIPPET_RULE = monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet;
+      const schemaData = schemaCache[platform];
+
+      // Column completions after "alias." or "table."
+      const dotMatch = lineText.match(/(\w+)\.\w*$/);
+      if (dotMatch) {
+        const prefix = dotMatch[1].toLowerCase();
+        const tablesInScope = extractTablesInScope(fullSql, schemaData ? schemaData.tables : []);
+        const tableObj = tablesInScope.get(prefix)
+          || (schemaData && schemaData.tables.find((t) => t.name.toLowerCase() === prefix));
+        if (tableObj) {
+          for (const col of tableObj.columns) {
+            const quoted = quoteIdentifier(col.name, platform);
+            suggestions.push({
+              label: col.name,
+              kind: KW.Field,
+              insertText: quoted,
+              detail: col.type + (quoted !== col.name ? '  [ ]' : ''),
+              documentation: `${tableObj.name}.${col.name}`,
+              sortText: `0_${col.name}`,
+              range
+            });
+          }
+        }
+        return { suggestions };
+      }
+
+      // Columns from tables currently in scope (FROM/JOIN already written)
+      const tablesInScope = extractTablesInScope(fullSql, schemaData ? schemaData.tables : []);
+      const seenColumns = new Set();
+      for (const tableObj of tablesInScope.values()) {
+        for (const col of tableObj.columns) {
+          if (seenColumns.has(col.name)) continue;
+          seenColumns.add(col.name);
+          const quoted = quoteIdentifier(col.name, platform);
+          suggestions.push({
+            label: col.name,
+            kind: KW.Field,
+            insertText: quoted,
+            detail: `${tableObj.name} · ${col.type}` + (quoted !== col.name ? '  [ ]' : ''),
+            documentation: `${tableObj.name}.${col.name}`,
+            sortText: `1_${col.name}`,
+            range
+          });
+        }
+      }
+
+      // All table names
+      if (schemaData) {
+        for (const table of schemaData.tables) {
+          const quoted = quoteIdentifier(table.name, platform);
+          suggestions.push({
+            label: table.name,
+            kind: KW.Class,
+            insertText: quoted,
+            detail: (table.schema || 'tabla') + (quoted !== table.name ? '  [ ]' : ''),
+            documentation: `${table.schema ? table.schema + '.' : ''}${table.name}`,
+            sortText: `2_${table.name}`,
+            range
+          });
+        }
+      }
+
+      // Keywords and functions
+      for (const kw of getKeywordsForPlatform(platform)) {
+        suggestions.push({
+          label: kw.label,
+          kind: kw.snippet ? KW.Function : KW.Keyword,
+          insertText: kw.snippet || kw.label,
+          insertTextRules: kw.snippet ? SNIPPET_RULE : undefined,
+          detail: kw.detail || '',
+          sortText: `3_${kw.label}`,
+          range
+        });
+      }
+
+      return { suggestions };
+    }
+  });
+}
+
+function initMonaco() {
+  require.config({
+    paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs' }
+  });
+
+  require(['vs/editor/editor.main'], function () {
+    editor = monaco.editor.create(document.getElementById('query-editor'), {
+      value: 'SELECT 1 AS ok;',
+      language: 'sql',
+      theme: 'vs',
+      minimap: { enabled: false },
+      fontSize: 14,
+      fontFamily: "'Cascadia Code', Consolas, 'Courier New', monospace",
+      lineNumbers: 'on',
+      automaticLayout: true,
+      scrollBeyondLastLine: false,
+      wordWrap: 'off',
+      tabSize: 2,
+      suggestOnTriggerCharacters: true,
+      quickSuggestions: { other: true, comments: false, strings: false },
+      suggestSelection: 'first',
+      acceptSuggestionOnEnter: 'smart',
+      padding: { top: 10, bottom: 10 },
+      renderLineHighlight: 'line',
+      scrollbar: { verticalScrollbarSize: 6, horizontalScrollbarSize: 6 },
+      fixedOverflowWidgets: true
+    });
+
+    editor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+      function () { if (!executeBtnEl.disabled) executeQuery(); }
+    );
+
+    registerCompletionProvider();
+  });
 }
 
 platformEl.addEventListener('change', renderConnectionInfo);
 executeBtnEl.addEventListener('click', executeQuery);
-queryEl.addEventListener('keydown', handleQueryShortcuts);
-templateBtnEls.forEach((button) => button.addEventListener('click', applyTemplateQuery));
+templateBtnEls.forEach((btn) => btn.addEventListener('click', applyTemplateQuery));
 
 renderConnectionInfo();
 loadSettings();
-queryEl.value = 'SELECT 1 AS ok;';
+initMonaco();

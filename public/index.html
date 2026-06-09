@@ -11,6 +11,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs/editor/editor.main.css" />
   </head>
   <body>
     <main class="container">
@@ -43,8 +44,10 @@
             <button class="template-btn" type="button" data-template="server_version">Version del servidor</button>
           </div>
 
-          <label for="query">Consulta SQL</label>
-          <textarea id="query" rows="11" placeholder="SELECT * FROM my_table;"></textarea>
+          <label>Consulta SQL</label>
+          <div class="editor-wrap">
+            <div id="query-editor"></div>
+          </div>
 
           <div class="actions-row">
             <button id="executeBtn">Ejecutar consulta</button>
@@ -63,6 +66,7 @@
       </div>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs/loader.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
