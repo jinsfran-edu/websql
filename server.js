@@ -613,6 +613,60 @@ app.post('/api/query', async (req, res) => {
   }
 });
 
+app.get('/api/schema', async (req, res) => {
+  const platform = normalizePlatform(req.query.platform);
+  if (!platform) {
+    return res.status(400).json({ error: 'Invalid platform' });
+  }
+
+  const schemaQueries = {
+    sqlserver: `SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, DATA_TYPE
+                FROM INFORMATION_SCHEMA.COLUMNS
+                ORDER BY TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION`,
+    mysql: `SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, DATA_TYPE
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+            ORDER BY TABLE_NAME, ORDINAL_POSITION
+            LIMIT 2000`,
+    postgresql: `SELECT table_schema, table_name, column_name, data_type
+                 FROM information_schema.columns
+                 WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+                 ORDER BY table_schema, table_name, ordinal_position
+                 LIMIT 2000`
+  };
+
+  try {
+    const connection = getConnectionFromEnv(platform);
+    let result;
+
+    if (platform === 'sqlserver') {
+      result = await runSqlServerQuery(connection, schemaQueries.sqlserver);
+    } else if (platform === 'mysql') {
+      result = await runMySqlQuery(connection, schemaQueries.mysql);
+    } else {
+      result = await runPostgreSqlQuery(connection, schemaQueries.postgresql);
+    }
+
+    const tablesMap = new Map();
+    for (const row of result.rows) {
+      const schema = row.TABLE_SCHEMA || row.table_schema || '';
+      const table = row.TABLE_NAME || row.table_name || '';
+      const column = row.COLUMN_NAME || row.column_name || '';
+      const dataType = row.DATA_TYPE || row.data_type || '';
+      const key = `${schema}.${table}`;
+
+      if (!tablesMap.has(key)) {
+        tablesMap.set(key, { schema, name: table, columns: [] });
+      }
+      tablesMap.get(key).columns.push({ name: column, type: dataType });
+    }
+
+    return res.json({ tables: Array.from(tablesMap.values()) });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/settings', (_req, res) => {
   res.json({
     readOnlyMode,
