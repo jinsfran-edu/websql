@@ -277,6 +277,11 @@ tbody tr:hover {
   background: #f5f9f9;
 }
 
+td.null-value {
+  font-style: italic;
+  color: #94a3b8;
+}
+
 .error {
   background: var(--warn-bg);
   color: var(--warn-ink);

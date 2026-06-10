@@ -362,7 +362,11 @@ function renderRows(columns, rows) {
   const header = safeColumns.map((c) => `<th>${c}</th>`).join('');
   const body = rows
     .map((row) => {
-      const tds = columns.map((c) => `<td>${escapeHtml(row[c] == null ? '' : row[c])}</td>`).join('');
+      const tds = columns
+        .map((c) => (row[c] == null
+          ? '<td class="null-value">NULL</td>'
+          : `<td>${escapeHtml(row[c])}</td>`))
+        .join('');
       return `<tr>${tds}</tr>`;
     })
     .join('');
