@@ -14,6 +14,7 @@ const port = process.env.PORT || 3000;
 const readOnlyMode = String(process.env.READ_ONLY_MODE || 'true').toLowerCase() !== 'false';
 const sqlServerDiagnosticsEnabled = String(process.env.SQLSERVER_DIAGNOSTICS || 'false').toLowerCase() === 'true';
 const queryTimeoutMs = Math.max(1, toInt(process.env.QUERY_TIMEOUT_MS, 15000));
+const maxResultRows = Math.max(1, toInt(process.env.MAX_RESULT_ROWS, 500));
 const queryStatsLogPath = process.env.QUERY_STATS_LOG_PATH
   ? path.resolve(process.env.QUERY_STATS_LOG_PATH)
   : path.join(__dirname, 'logs', 'query-stats.jsonl');
@@ -568,6 +569,13 @@ app.post('/api/query', async (req, res) => {
       result = await runPostgreSqlQuery(connection, query);
     }
 
+    // Cap the rows sent to the browser; rowCount keeps the real total fetched
+    let truncated = false;
+    if (Array.isArray(result.rows) && result.rows.length > maxResultRows) {
+      result.rows = result.rows.slice(0, maxResultRows);
+      truncated = true;
+    }
+
     const durationMs = Date.now() - startedAt;
     await appendQueryStat({
       timestamp: new Date().toISOString(),
@@ -584,6 +592,8 @@ app.post('/api/query', async (req, res) => {
       durationMs,
       connectMs: result.connectMs,
       queryMs: result.queryMs,
+      truncated,
+      maxResultRows,
       ...result
     });
   } catch (error) {
@@ -620,18 +630,24 @@ app.get('/api/schema', async (req, res) => {
   }
 
   const schemaQueries = {
-    sqlserver: `SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, DATA_TYPE
-                FROM INFORMATION_SCHEMA.COLUMNS
-                ORDER BY TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION`,
-    mysql: `SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, DATA_TYPE
-            FROM information_schema.COLUMNS
-            WHERE TABLE_SCHEMA = DATABASE()
-            ORDER BY TABLE_NAME, ORDINAL_POSITION
+    sqlserver: `SELECT c.TABLE_SCHEMA, c.TABLE_NAME, c.COLUMN_NAME, c.DATA_TYPE, t.TABLE_TYPE
+                FROM INFORMATION_SCHEMA.COLUMNS c
+                JOIN INFORMATION_SCHEMA.TABLES t
+                  ON t.TABLE_SCHEMA = c.TABLE_SCHEMA AND t.TABLE_NAME = c.TABLE_NAME
+                ORDER BY c.TABLE_SCHEMA, c.TABLE_NAME, c.ORDINAL_POSITION`,
+    mysql: `SELECT c.TABLE_SCHEMA, c.TABLE_NAME, c.COLUMN_NAME, c.DATA_TYPE, t.TABLE_TYPE
+            FROM information_schema.COLUMNS c
+            JOIN information_schema.TABLES t
+              ON t.TABLE_SCHEMA = c.TABLE_SCHEMA AND t.TABLE_NAME = c.TABLE_NAME
+            WHERE c.TABLE_SCHEMA = DATABASE()
+            ORDER BY c.TABLE_NAME, c.ORDINAL_POSITION
             LIMIT 2000`,
-    postgresql: `SELECT table_schema, table_name, column_name, data_type
-                 FROM information_schema.columns
-                 WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
-                 ORDER BY table_schema, table_name, ordinal_position
+    postgresql: `SELECT c.table_schema, c.table_name, c.column_name, c.data_type, t.table_type
+                 FROM information_schema.columns c
+                 JOIN information_schema.tables t
+                   ON t.table_schema = c.table_schema AND t.table_name = c.table_name
+                 WHERE c.table_schema NOT IN ('pg_catalog', 'information_schema')
+                 ORDER BY c.table_schema, c.table_name, c.ordinal_position
                  LIMIT 2000`
   };
 
@@ -653,10 +669,11 @@ app.get('/api/schema', async (req, res) => {
       const table = row.TABLE_NAME || row.table_name || '';
       const column = row.COLUMN_NAME || row.column_name || '';
       const dataType = row.DATA_TYPE || row.data_type || '';
+      const tableType = String(row.TABLE_TYPE || row.table_type || '').toUpperCase() === 'VIEW' ? 'view' : 'table';
       const key = `${schema}.${table}`;
 
       if (!tablesMap.has(key)) {
-        tablesMap.set(key, { schema, name: table, columns: [] });
+        tablesMap.set(key, { schema, name: table, type: tableType, columns: [] });
       }
       tablesMap.get(key).columns.push({ name: column, type: dataType });
     }
@@ -671,7 +688,8 @@ app.get('/api/settings', (_req, res) => {
   res.json({
     readOnlyMode,
     sqlServerDiagnosticsEnabled,
-    queryTimeoutMs
+    queryTimeoutMs,
+    maxResultRows
   });
 });
 

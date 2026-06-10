@@ -66,7 +66,7 @@ h1 {
 
 .layout {
   display: grid;
-  grid-template-columns: 1.25fr 1fr;
+  grid-template-columns: 250px 1.25fr 1fr;
   gap: 16px;
 }
 
@@ -155,36 +155,119 @@ select:focus {
   color: #8b5e22;
 }
 
-.query-toolbar {
+.side-panel {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin: 6px 0 14px;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 78vh;
 }
 
-.query-toolbar p {
-  margin: 0;
-  font-size: 0.86rem;
-  color: #475569;
-  font-weight: 600;
+.side-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
 }
 
-.template-btn {
-  width: auto;
-  margin: 0;
+.side-tab {
+  flex: 1;
   border: 1px solid #d0e4dd;
   border-radius: 999px;
   background: #f2faf8;
   color: #0f5d57;
   cursor: pointer;
-  padding: 6px 11px;
-  font-size: 0.78rem;
+  padding: 6px 10px;
+  font-size: 0.8rem;
   font-weight: 700;
 }
 
-.template-btn:hover {
-  background: #dff2ed;
+.side-tab.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #f8fafa;
+}
+
+.side-content {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.side-empty {
+  margin: 8px 2px;
+  color: #64748b;
+  font-size: 0.84rem;
+}
+
+.tree-table {
+  margin-bottom: 2px;
+}
+
+.tree-table-head,
+.tree-col,
+.history-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 8px;
+  font: inherit;
+  color: var(--ink);
+}
+
+.tree-table-head {
+  padding: 6px 8px;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.tree-table-head:hover,
+.tree-col:hover,
+.history-item:hover {
+  background: #e9f5f3;
+}
+
+.tree-caret {
+  color: var(--primary-strong);
+  display: inline-block;
+  width: 12px;
+}
+
+.tree-col {
+  padding: 4px 8px 4px 28px;
+  font-size: 0.82rem;
+  font-family: 'Cascadia Code', Consolas, monospace;
+}
+
+.tree-type {
+  color: #94a3b8;
+  font-size: 0.74rem;
+}
+
+.history-item {
+  padding: 7px 8px;
+  margin-bottom: 4px;
+  border: 1px solid transparent;
+}
+
+.history-item.history-failed {
+  border-color: #fdba99;
+}
+
+.history-meta {
+  display: block;
+  font-size: 0.72rem;
+  color: #64748b;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.history-sql {
+  display: block;
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 0.78rem;
+  word-break: break-word;
 }
 
 #executeBtn {
@@ -305,9 +388,27 @@ td.null-value {
   }
 }
 
+@media (max-width: 1180px) {
+  .layout {
+    grid-template-columns: 250px 1fr;
+  }
+
+  .result-panel {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 940px) {
   .layout {
     grid-template-columns: 1fr;
+  }
+
+  .result-panel {
+    grid-column: auto;
+  }
+
+  .side-panel {
+    max-height: 300px;
   }
 
   .result-head {

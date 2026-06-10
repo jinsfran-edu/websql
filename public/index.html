@@ -22,6 +22,15 @@
       </header>
 
       <div class="layout">
+        <aside class="panel side-panel">
+          <div class="side-tabs">
+            <button id="tabSchema" class="side-tab active" type="button">Esquema</button>
+            <button id="tabHistory" class="side-tab" type="button">Historial</button>
+          </div>
+          <div id="schemaTree" class="side-content"></div>
+          <div id="historyList" class="side-content hidden"></div>
+        </aside>
+
         <section class="panel editor-panel">
           <div class="field-row">
             <label for="platform">Plataforma</label>
@@ -34,14 +43,6 @@
 
           <div class="badge-row">
             <p id="connectionInfo" class="badge"></p>
-          </div>
-
-          <div class="query-toolbar">
-            <p>Plantillas:</p>
-            <button class="template-btn" type="button" data-template="current_time">Fecha actual</button>
-            <button class="template-btn" type="button" data-template="tables">Tablas</button>
-            <button class="template-btn" type="button" data-template="columns_count">Conteo columnas</button>
-            <button class="template-btn" type="button" data-template="server_version">Version del servidor</button>
           </div>
 
           <label>Consulta SQL</label>

@@ -1,10 +1,13 @@
 const platformEl = document.getElementById('platform');
 const connectionInfoEl = document.getElementById('connectionInfo');
 const executeBtnEl = document.getElementById('executeBtn');
-const templateBtnEls = document.querySelectorAll('.template-btn');
 const metaEl = document.getElementById('meta');
 const errorEl = document.getElementById('error');
 const tableWrapEl = document.getElementById('tableWrap');
+const schemaTreeEl = document.getElementById('schemaTree');
+const historyListEl = document.getElementById('historyList');
+const tabSchemaEl = document.getElementById('tabSchema');
+const tabHistoryEl = document.getElementById('tabHistory');
 
 let appSettings = { readOnlyMode: null };
 let editor = null;
@@ -28,26 +31,8 @@ const defaultConnections = {
   }
 };
 
-const sqlTemplatesByPlatform = {
-  sqlserver: {
-    current_time: 'SELECT GETDATE() AS fecha_hora;',
-    tables: 'SELECT TOP 20 TABLE_SCHEMA, TABLE_NAME FROM INFORMATION_SCHEMA.TABLES ORDER BY TABLE_SCHEMA, TABLE_NAME;',
-    columns_count: 'SELECT COUNT(*) AS total FROM INFORMATION_SCHEMA.COLUMNS;',
-    server_version: 'SELECT @@VERSION AS version_servidor;'
-  },
-  mysql: {
-    current_time: 'SELECT NOW() AS fecha_hora;',
-    tables: 'SELECT TABLE_SCHEMA, TABLE_NAME FROM information_schema.tables ORDER BY TABLE_SCHEMA, TABLE_NAME LIMIT 20;',
-    columns_count: 'SELECT COUNT(*) AS total FROM information_schema.columns;',
-    server_version: 'SELECT VERSION() AS version_servidor;'
-  },
-  postgresql: {
-    current_time: 'SELECT NOW() AS fecha_hora;',
-    tables: "SELECT table_schema, table_name FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog', 'information_schema') ORDER BY table_schema, table_name LIMIT 20;",
-    columns_count: 'SELECT COUNT(*) AS total FROM information_schema.columns;',
-    server_version: 'SELECT pg_catalog.version() AS version_servidor;'
-  }
-};
+const HISTORY_KEY = 'websql_query_history';
+const HISTORY_MAX = 25;
 
 // Dialect-specific keyword/function lists
 const KEYWORDS = {
@@ -293,27 +278,145 @@ function renderConnectionInfo() {
   const platform = platformEl.value;
   const info = defaultConnections[platform];
   connectionInfoEl.textContent = `Servidor: ${info.host} | Base: ${info.database} | Usuario: ${info.user}`;
-  renderTemplateButtons();
-  prefetchSchema(platform);
-}
-
-function resolveTemplateSql(platform, templateName) {
-  return (sqlTemplatesByPlatform[platform] || {})[templateName] || '';
-}
-
-function renderTemplateButtons() {
-  const platform = platformEl.value;
-  templateBtnEls.forEach((button) => {
-    const templateName = button.getAttribute('data-template');
-    const sql = resolveTemplateSql(platform, templateName);
-    if (!sql) {
-      button.disabled = true;
-      button.removeAttribute('title');
-    } else {
-      button.disabled = false;
-      button.setAttribute('title', sql);
-    }
+  renderSchemaExplorer();
+  prefetchSchema(platform).then(() => {
+    if (platformEl.value === platform) renderSchemaExplorer();
   });
+}
+
+// ---------- Explorador de esquema ----------
+
+function insertIntoEditor(text) {
+  if (!editor) return;
+  editor.trigger('keyboard', 'type', { text });
+  editor.focus();
+}
+
+function renderSchemaExplorer() {
+  const platform = platformEl.value;
+  const schemaData = schemaCache[platform];
+
+  if (!schemaData) {
+    schemaTreeEl.innerHTML = '<p class="side-empty">Cargando esquema...</p>';
+    return;
+  }
+
+  // Las vistas quedan fuera del árbol pero siguen en el autocompletado
+  const baseTables = schemaData.tables.filter((t) => t.type !== 'view');
+
+  if (!baseTables.length) {
+    schemaTreeEl.innerHTML = '<p class="side-empty">La base no tiene tablas.</p>';
+    return;
+  }
+
+  schemaTreeEl.innerHTML = '';
+  for (const table of baseTables) {
+    const tableEl = document.createElement('div');
+    tableEl.className = 'tree-table';
+
+    const headEl = document.createElement('button');
+    headEl.type = 'button';
+    headEl.className = 'tree-table-head';
+    headEl.innerHTML = `<span class="tree-caret">▸</span> ${escapeHtml(table.name)}`;
+    headEl.title = 'Clic: ver columnas · Doble clic: insertar en el editor';
+
+    const colsEl = document.createElement('div');
+    colsEl.className = 'tree-cols hidden';
+    for (const col of table.columns) {
+      const colEl = document.createElement('button');
+      colEl.type = 'button';
+      colEl.className = 'tree-col';
+      colEl.innerHTML = `${escapeHtml(col.name)} <span class="tree-type">${escapeHtml(col.type)}</span>`;
+      colEl.title = 'Clic: insertar en el editor';
+      colEl.addEventListener('click', () => insertIntoEditor(quoteIdentifier(col.name, platformEl.value)));
+      colsEl.appendChild(colEl);
+    }
+
+    headEl.addEventListener('click', () => {
+      colsEl.classList.toggle('hidden');
+      headEl.querySelector('.tree-caret').textContent = colsEl.classList.contains('hidden') ? '▸' : '▾';
+    });
+    headEl.addEventListener('dblclick', () => insertIntoEditor(quoteIdentifier(table.name, platformEl.value)));
+
+    tableEl.appendChild(headEl);
+    tableEl.appendChild(colsEl);
+    schemaTreeEl.appendChild(tableEl);
+  }
+}
+
+// ---------- Historial de consultas ----------
+
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_e) {
+    return [];
+  }
+}
+
+function saveToHistory(sql, platform, success) {
+  const trimmed = String(sql || '').trim();
+  if (!trimmed) return;
+
+  let history = loadHistory();
+  // Evitar duplicados consecutivos de la misma consulta y plataforma
+  history = history.filter((item) => !(item.sql === trimmed && item.platform === platform));
+  history.unshift({ sql: trimmed, platform, success, ts: Date.now() });
+  if (history.length > HISTORY_MAX) history = history.slice(0, HISTORY_MAX);
+
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  } catch (_e) {
+    // localStorage lleno o deshabilitado: el historial es opcional
+  }
+  renderHistory();
+}
+
+function formatHistoryTime(ts) {
+  const date = new Date(ts);
+  const today = new Date();
+  const sameDay = date.toDateString() === today.toDateString();
+  const time = date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  return sameDay ? time : `${date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })} ${time}`;
+}
+
+function renderHistory() {
+  const history = loadHistory();
+  if (!history.length) {
+    historyListEl.innerHTML = '<p class="side-empty">Todavía no ejecutaste consultas.</p>';
+    return;
+  }
+
+  historyListEl.innerHTML = '';
+  for (const item of history) {
+    const itemEl = document.createElement('button');
+    itemEl.type = 'button';
+    itemEl.className = 'history-item' + (item.success ? '' : ' history-failed');
+    itemEl.innerHTML = `
+      <span class="history-meta">${escapeHtml(item.platform)} · ${formatHistoryTime(item.ts)}${item.success ? '' : ' · falló'}</span>
+      <span class="history-sql">${escapeHtml(item.sql.length > 120 ? item.sql.slice(0, 120) + '…' : item.sql)}</span>
+    `;
+    itemEl.title = item.sql;
+    itemEl.addEventListener('click', () => {
+      platformEl.value = item.platform;
+      renderConnectionInfo();
+      if (editor) {
+        editor.setValue(item.sql);
+        editor.focus();
+      }
+    });
+    historyListEl.appendChild(itemEl);
+  }
+}
+
+function switchSideTab(tab) {
+  const isSchema = tab === 'schema';
+  tabSchemaEl.classList.toggle('active', isSchema);
+  tabHistoryEl.classList.toggle('active', !isSchema);
+  schemaTreeEl.classList.toggle('hidden', !isSchema);
+  historyListEl.classList.toggle('hidden', isSchema);
 }
 
 const schemaFetchesInFlight = {};
@@ -385,14 +488,16 @@ async function executeQuery() {
   executeBtnEl.disabled = true;
   executeBtnEl.textContent = 'Ejecutando...';
 
+  const queryText = editor ? editor.getValue() : '';
+  const platform = platformEl.value;
+
   try {
-    const queryText = editor ? editor.getValue() : '';
     const statements = splitSqlStatements(queryText);
     if (statements.length !== 1) {
       throw new Error('Solo se permite ejecutar una consulta por vez.');
     }
 
-    const payload = { platform: platformEl.value, query: queryText };
+    const payload = { platform, query: queryText };
     const response = await fetch('/api/query', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -408,23 +513,22 @@ async function executeQuery() {
     if (typeof data.serverExecMs === 'number') timingParts.push(`Ejecución en servidor: ${data.serverExecMs} ms`);
     if (typeof data.transportOverheadMs === 'number') timingParts.push(`Transporte/driver: ${data.transportOverheadMs} ms`);
 
-    metaEl.textContent = `Plataforma: ${data.platform} | Filas: ${data.rowCount} | ${timingParts.join(' | ')}`;
+    const rowsLabel = data.truncated
+      ? `Filas: ${data.rowCount} (mostrando las primeras ${data.rows.length})`
+      : `Filas: ${data.rowCount}`;
+    metaEl.textContent = `Plataforma: ${data.platform} | ${rowsLabel} | ${timingParts.join(' | ')}`;
     renderRows(data.columns || [], data.rows || []);
+    saveToHistory(queryText, platform, true);
   } catch (error) {
     errorEl.classList.remove('hidden');
     errorEl.textContent = error.message;
+    saveToHistory(queryText, platform, false);
   } finally {
     executeBtnEl.disabled = false;
     executeBtnEl.textContent = 'Ejecutar consulta';
   }
 }
 
-function applyTemplateQuery(event) {
-  const sql = resolveTemplateSql(platformEl.value, event.currentTarget.getAttribute('data-template'));
-  if (!sql || !editor) return;
-  editor.setValue(sql);
-  editor.focus();
-}
 
 // Reserved words that need quoting when used as identifiers (common subset).
 const SQL_RESERVED = new Set([
@@ -626,8 +730,10 @@ function initMonaco() {
 
 platformEl.addEventListener('change', renderConnectionInfo);
 executeBtnEl.addEventListener('click', executeQuery);
-templateBtnEls.forEach((btn) => btn.addEventListener('click', applyTemplateQuery));
+tabSchemaEl.addEventListener('click', () => switchSideTab('schema'));
+tabHistoryEl.addEventListener('click', () => switchSideTab('history'));
 
 renderConnectionInfo();
 loadSettings();
+renderHistory();
 initMonaco();
