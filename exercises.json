@@ -1,0 +1,504 @@
+{
+  "exercises": [
+    {
+      "id": 1,
+      "dificultad": "básica",
+      "ordenado": true,
+      "enunciado": "Seleccione todos los campos de la tabla Clientes, ordenados por nombre del contacto de la empresa, alfabéticamente.",
+      "solucion": {
+        "sqlserver": "SELECT IDCliente, NombreEmpresa, NombreContacto, PuestoContacto, Direccion, Ciudad, Region, CodigoPostal, Pais, Telefono, Fax FROM Clientes ORDER BY NombreContacto;",
+        "mysql": "SELECT IDCliente, NombreEmpresa, NombreContacto, PuestoContacto, Direccion, Ciudad, Region, CodigoPostal, Pais, Telefono, Fax FROM Clientes ORDER BY NombreContacto;"
+      }
+    },
+    {
+      "id": 2,
+      "dificultad": "básica",
+      "ordenado": true,
+      "enunciado": "Seleccione todos los campos de la tabla Pedidos, ordenados por fecha de la orden, descendentemente.",
+      "solucion": {
+        "sqlserver": "SELECT IDPedido, IDCliente, IDEmpleado, FechaPedido, FechaRequerida, FechaEnvio, EnvioPor, Flete, NombreEnvio, DireccionEnvio, CiudadEnvio, RegionEnvio, CodigoPostalEnvio, PaisEnvio FROM Pedidos ORDER BY FechaPedido DESC;",
+        "mysql": "SELECT IDPedido, IDCliente, IDEmpleado, FechaPedido, FechaRequerida, FechaEnvio, EnvioPor, Flete, NombreEnvio, DireccionEnvio, CiudadEnvio, RegionEnvio, CodigoPostalEnvio, PaisEnvio FROM Pedidos ORDER BY FechaPedido DESC;"
+      }
+    },
+    {
+      "id": 3,
+      "dificultad": "básica",
+      "ordenado": true,
+      "enunciado": "Seleccione todos los campos de la tabla Detalles Pedido, ordenados por cantidad pedida, ascendentemente.",
+      "solucion": {
+        "sqlserver": "SELECT IDPedido, IDProducto, PrecioUnitario, Cantidad, Descuento FROM [Detalles Pedido] ORDER BY Cantidad;",
+        "mysql": "SELECT IDPedido, IDProducto, PrecioUnitario, Cantidad, Descuento FROM `Detalles Pedido` ORDER BY Cantidad;"
+      }
+    },
+    {
+      "id": 4,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Obtener todos los productos cuyo nombre comienza con la letra P y tienen un precio unitario comprendido entre 10 y 120.",
+      "solucion": {
+        "sqlserver": "SELECT IDProducto, NombreProducto, IDProveedor, IDCategoria, CantidadPorUnidad, PrecioUnitario, UnidadesEnStock, UnidadesEnPedidos, NivelNuevoPedido, Discontinuado FROM Productos WHERE NombreProducto LIKE 'P%' AND PrecioUnitario BETWEEN 10 AND 120;",
+        "mysql": "SELECT IDProducto, NombreProducto, IDProveedor, IDCategoria, CantidadPorUnidad, PrecioUnitario, UnidadesEnStock, UnidadesEnPedidos, NivelNuevoPedido, Discontinuado FROM Productos WHERE NombreProducto LIKE 'P%' AND PrecioUnitario BETWEEN 10 AND 120;"
+      }
+    },
+    {
+      "id": 5,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Obtener todos los clientes de los países: EE.UU., Francia y Reino Unido.",
+      "solucion": {
+        "sqlserver": "SELECT IDCliente, NombreEmpresa, NombreContacto, PuestoContacto, Direccion, Ciudad, Region, CodigoPostal, Pais, Telefono, Fax FROM Clientes WHERE Pais IN ('EE.UU.', 'Francia', 'Reino Unido');",
+        "mysql": "SELECT IDCliente, NombreEmpresa, NombreContacto, PuestoContacto, Direccion, Ciudad, Region, CodigoPostal, Pais, Telefono, Fax FROM Clientes WHERE Pais IN ('EE.UU.', 'Francia', 'Reino Unido');"
+      }
+    },
+    {
+      "id": 6,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Obtener todos los productos descontinuados y sin stock, que pertenecen a las categorías 1, 4 y 6.",
+      "solucion": {
+        "sqlserver": "SELECT IDProducto, NombreProducto, IDProveedor, IDCategoria, CantidadPorUnidad, PrecioUnitario, UnidadesEnStock, UnidadesEnPedidos, NivelNuevoPedido, Discontinuado FROM Productos WHERE Discontinuado = 1 AND UnidadesEnStock = 0 AND IDCategoria IN (1, 4, 6);",
+        "mysql": "SELECT IDProducto, NombreProducto, IDProveedor, IDCategoria, CantidadPorUnidad, PrecioUnitario, UnidadesEnStock, UnidadesEnPedidos, NivelNuevoPedido, Discontinuado FROM Productos WHERE Discontinuado = 1 AND UnidadesEnStock = 0 AND IDCategoria IN (1, 4, 6);"
+      }
+    },
+    {
+      "id": 7,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Obtener todos los pedidos hechos por los empleados con código 2, 5, 7 y 8 en el año 2019.",
+      "solucion": {
+        "sqlserver": "SELECT IDPedido, IDCliente, IDEmpleado, FechaPedido, FechaRequerida, FechaEnvio, EnvioPor, Flete, NombreEnvio, DireccionEnvio, CiudadEnvio, RegionEnvio, CodigoPostalEnvio, PaisEnvio FROM Pedidos WHERE IDEmpleado IN (2, 5, 7, 8) AND FechaPedido >= '20190101' AND FechaPedido < '20200101';",
+        "mysql": "SELECT IDPedido, IDCliente, IDEmpleado, FechaPedido, FechaRequerida, FechaEnvio, EnvioPor, Flete, NombreEnvio, DireccionEnvio, CiudadEnvio, RegionEnvio, CodigoPostalEnvio, PaisEnvio FROM Pedidos WHERE IDEmpleado IN (2, 5, 7, 8) AND FechaPedido >= '2019-01-01' AND FechaPedido < '2020-01-01';"
+      }
+    },
+    {
+      "id": 8,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Seleccionar todos los clientes que cuenten con FAX.",
+      "solucion": {
+        "sqlserver": "SELECT IDCliente, NombreEmpresa, NombreContacto, PuestoContacto, Direccion, Ciudad, Region, CodigoPostal, Pais, Telefono, Fax FROM Clientes WHERE Fax IS NOT NULL;",
+        "mysql": "SELECT IDCliente, NombreEmpresa, NombreContacto, PuestoContacto, Direccion, Ciudad, Region, CodigoPostal, Pais, Telefono, Fax FROM Clientes WHERE Fax IS NOT NULL;"
+      }
+    },
+    {
+      "id": 9,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Seleccionar todos los clientes que no cuenten con FAX, del país EE.UU.",
+      "solucion": {
+        "sqlserver": "SELECT IDCliente, NombreEmpresa, NombreContacto, PuestoContacto, Direccion, Ciudad, Region, CodigoPostal, Pais, Telefono, Fax FROM Clientes WHERE Fax IS NULL AND Pais = 'EE.UU.';",
+        "mysql": "SELECT IDCliente, NombreEmpresa, NombreContacto, PuestoContacto, Direccion, Ciudad, Region, CodigoPostal, Pais, Telefono, Fax FROM Clientes WHERE Fax IS NULL AND Pais = 'EE.UU.';"
+      }
+    },
+    {
+      "id": 10,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Seleccionar todos los empleados que cuentan con un jefe.",
+      "solucion": {
+        "sqlserver": "SELECT IDEmpleado, Apellido, Nombre, Puesto, Saludo, FechaNacimiento, FechaAlta, Direccion, Ciudad, Region, CodigoPostal, Pais, TelefonoCasa, Interno, Notas, JefeID, RutaFoto FROM Empleados WHERE JefeID IS NOT NULL;",
+        "mysql": "SELECT IDEmpleado, Apellido, Nombre, Puesto, Saludo, FechaNacimiento, FechaAlta, Direccion, Ciudad, Region, CodigoPostal, Pais, TelefonoCasa, Interno, Notas, JefeID, RutaFoto FROM Empleados WHERE JefeID IS NOT NULL;"
+      }
+    },
+    {
+      "id": 11,
+      "dificultad": "básica",
+      "ordenado": true,
+      "enunciado": "Seleccionar todos los campos del cliente cuya empresa empiece con las letras O hasta la S y pertenezca al país EE.UU., ordenados por la dirección.",
+      "solucion": {
+        "sqlserver": "SELECT IDCliente, NombreEmpresa, NombreContacto, PuestoContacto, Direccion, Ciudad, Region, CodigoPostal, Pais, Telefono, Fax FROM Clientes WHERE NombreEmpresa >= 'O' AND NombreEmpresa < 'T' AND Pais = 'EE.UU.' ORDER BY Direccion;",
+        "mysql": "SELECT IDCliente, NombreEmpresa, NombreContacto, PuestoContacto, Direccion, Ciudad, Region, CodigoPostal, Pais, Telefono, Fax FROM Clientes WHERE NombreEmpresa >= 'O' AND NombreEmpresa < 'T' AND Pais = 'EE.UU.' ORDER BY Direccion;"
+      }
+    },
+    {
+      "id": 12,
+      "dificultad": "básica",
+      "ordenado": true,
+      "enunciado": "Seleccionar todos los campos del cliente cuya empresa empiece con las letras B a la G y pertenezca al Reino Unido, ordenados por nombre de la empresa.",
+      "solucion": {
+        "sqlserver": "SELECT IDCliente, NombreEmpresa, NombreContacto, PuestoContacto, Direccion, Ciudad, Region, CodigoPostal, Pais, Telefono, Fax FROM Clientes WHERE NombreEmpresa >= 'B' AND NombreEmpresa < 'H' AND Pais = 'Reino Unido' ORDER BY NombreEmpresa;",
+        "mysql": "SELECT IDCliente, NombreEmpresa, NombreContacto, PuestoContacto, Direccion, Ciudad, Region, CodigoPostal, Pais, Telefono, Fax FROM Clientes WHERE NombreEmpresa >= 'B' AND NombreEmpresa < 'H' AND Pais = 'Reino Unido' ORDER BY NombreEmpresa;"
+      }
+    },
+    {
+      "id": 13,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Seleccionar los productos vigentes cuyos precios unitarios están entre 35 y 250, sin stock en almacén, pertenecientes a las categorías 1, 3, 4, 6 y 8, distribuidos por los proveedores 2, 4, 6, 7, 8 y 9.",
+      "solucion": {
+        "sqlserver": "SELECT IDProducto, NombreProducto, IDProveedor, IDCategoria, CantidadPorUnidad, PrecioUnitario, UnidadesEnStock, UnidadesEnPedidos, NivelNuevoPedido, Discontinuado FROM Productos WHERE Discontinuado = 0 AND PrecioUnitario BETWEEN 35 AND 250 AND UnidadesEnStock = 0 AND IDCategoria IN (1, 3, 4, 6, 8) AND IDProveedor IN (2, 4, 6, 7, 8, 9);",
+        "mysql": "SELECT IDProducto, NombreProducto, IDProveedor, IDCategoria, CantidadPorUnidad, PrecioUnitario, UnidadesEnStock, UnidadesEnPedidos, NivelNuevoPedido, Discontinuado FROM Productos WHERE Discontinuado = 0 AND PrecioUnitario BETWEEN 35 AND 250 AND UnidadesEnStock = 0 AND IDCategoria IN (1, 3, 4, 6, 8) AND IDProveedor IN (2, 4, 6, 7, 8, 9);"
+      }
+    },
+    {
+      "id": 14,
+      "dificultad": "básica",
+      "ordenado": true,
+      "enunciado": "Seleccionar todos los campos de los productos descontinuados que pertenezcan a los proveedores con códigos 1, 3, 7, 8 y 9, que tengan stock en almacén y cuyos precios unitarios estén entre 39 y 190, ordenados por código de proveedor y precio unitario de manera ascendente.",
+      "solucion": {
+        "sqlserver": "SELECT IDProducto, NombreProducto, IDProveedor, IDCategoria, CantidadPorUnidad, PrecioUnitario, UnidadesEnStock, UnidadesEnPedidos, NivelNuevoPedido, Discontinuado FROM Productos WHERE Discontinuado = 1 AND IDProveedor IN (1, 3, 7, 8, 9) AND UnidadesEnStock > 0 AND PrecioUnitario BETWEEN 39 AND 190 ORDER BY IDProveedor, PrecioUnitario;",
+        "mysql": "SELECT IDProducto, NombreProducto, IDProveedor, IDCategoria, CantidadPorUnidad, PrecioUnitario, UnidadesEnStock, UnidadesEnPedidos, NivelNuevoPedido, Discontinuado FROM Productos WHERE Discontinuado = 1 AND IDProveedor IN (1, 3, 7, 8, 9) AND UnidadesEnStock > 0 AND PrecioUnitario BETWEEN 39 AND 190 ORDER BY IDProveedor, PrecioUnitario;"
+      }
+    },
+    {
+      "id": 15,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Seleccionar los 7 productos con precio más caro que cuenten con stock en almacén.",
+      "solucion": {
+        "sqlserver": "SELECT TOP 7 IDProducto, NombreProducto, IDProveedor, IDCategoria, CantidadPorUnidad, PrecioUnitario, UnidadesEnStock, UnidadesEnPedidos, NivelNuevoPedido, Discontinuado FROM Productos WHERE UnidadesEnStock > 0 ORDER BY PrecioUnitario DESC;",
+        "mysql": "SELECT IDProducto, NombreProducto, IDProveedor, IDCategoria, CantidadPorUnidad, PrecioUnitario, UnidadesEnStock, UnidadesEnPedidos, NivelNuevoPedido, Discontinuado FROM Productos WHERE UnidadesEnStock > 0 ORDER BY PrecioUnitario DESC LIMIT 7;"
+      }
+    },
+    {
+      "id": 16,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Seleccionar los 9 productos con menos stock en almacén que pertenezcan a las categorías 3, 5 y 8.",
+      "solucion": {
+        "sqlserver": "SELECT TOP 9 IDProducto, NombreProducto, IDProveedor, IDCategoria, CantidadPorUnidad, PrecioUnitario, UnidadesEnStock, UnidadesEnPedidos, NivelNuevoPedido, Discontinuado FROM Productos WHERE IDCategoria IN (3, 5, 8) ORDER BY UnidadesEnStock;",
+        "mysql": "SELECT IDProducto, NombreProducto, IDProveedor, IDCategoria, CantidadPorUnidad, PrecioUnitario, UnidadesEnStock, UnidadesEnPedidos, NivelNuevoPedido, Discontinuado FROM Productos WHERE IDCategoria IN (3, 5, 8) ORDER BY UnidadesEnStock LIMIT 9;"
+      }
+    },
+    {
+      "id": 17,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Seleccionar los pedidos realizados por los empleados con código entre 2 y 5, de los clientes con código que comienza con las letras A hasta la G, despachados el 31 de enero de cualquier año.",
+      "solucion": {
+        "sqlserver": "SELECT IDPedido, IDCliente, IDEmpleado, FechaPedido, FechaRequerida, FechaEnvio, EnvioPor, Flete, NombreEnvio, DireccionEnvio, CiudadEnvio, RegionEnvio, CodigoPostalEnvio, PaisEnvio FROM Pedidos WHERE IDEmpleado BETWEEN 2 AND 5 AND IDCliente >= 'A' AND IDCliente < 'H' AND DAY(FechaEnvio) = 31 AND MONTH(FechaEnvio) = 1;",
+        "mysql": "SELECT IDPedido, IDCliente, IDEmpleado, FechaPedido, FechaRequerida, FechaEnvio, EnvioPor, Flete, NombreEnvio, DireccionEnvio, CiudadEnvio, RegionEnvio, CodigoPostalEnvio, PaisEnvio FROM Pedidos WHERE IDEmpleado BETWEEN 2 AND 5 AND IDCliente >= 'A' AND IDCliente < 'H' AND DAY(FechaEnvio) = 31 AND MONTH(FechaEnvio) = 1;"
+      }
+    },
+    {
+      "id": 18,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Seleccionar los pedidos realizados por el empleado con código 3, de cualquier año, pero solo de los últimos 5 meses del año (agosto a diciembre).",
+      "solucion": {
+        "sqlserver": "SELECT IDPedido, IDCliente, IDEmpleado, FechaPedido, FechaRequerida, FechaEnvio, EnvioPor, Flete, NombreEnvio, DireccionEnvio, CiudadEnvio, RegionEnvio, CodigoPostalEnvio, PaisEnvio FROM Pedidos WHERE IDEmpleado = 3 AND MONTH(FechaPedido) >= 8;",
+        "mysql": "SELECT IDPedido, IDCliente, IDEmpleado, FechaPedido, FechaRequerida, FechaEnvio, EnvioPor, Flete, NombreEnvio, DireccionEnvio, CiudadEnvio, RegionEnvio, CodigoPostalEnvio, PaisEnvio FROM Pedidos WHERE IDEmpleado = 3 AND MONTH(FechaPedido) >= 8;"
+      }
+    },
+    {
+      "id": 19,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Seleccionar los detalles de los pedidos que tengan una cantidad pedida entre 10 y 250.",
+      "solucion": {
+        "sqlserver": "SELECT IDPedido, IDProducto, PrecioUnitario, Cantidad, Descuento FROM [Detalles Pedido] WHERE Cantidad BETWEEN 10 AND 250;",
+        "mysql": "SELECT IDPedido, IDProducto, PrecioUnitario, Cantidad, Descuento FROM `Detalles Pedido` WHERE Cantidad BETWEEN 10 AND 250;"
+      }
+    },
+    {
+      "id": 20,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Seleccionar los detalles de los pedidos cuyo monto (precio unitario × cantidad, aplicando el descuento) esté entre 10 y 100.",
+      "solucion": {
+        "sqlserver": "SELECT IDPedido, IDProducto, PrecioUnitario, Cantidad, Descuento FROM [Detalles Pedido] WHERE PrecioUnitario * Cantidad * (1 - Descuento) BETWEEN 10 AND 100;",
+        "mysql": "SELECT IDPedido, IDProducto, PrecioUnitario, Cantidad, Descuento FROM `Detalles Pedido` WHERE PrecioUnitario * Cantidad * (1 - Descuento) BETWEEN 10 AND 100;"
+      }
+    },
+    {
+      "id": 21,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Informar los diferentes países que se encuentran en la tabla Clientes.",
+      "solucion": {
+        "sqlserver": "SELECT DISTINCT Pais FROM Clientes;",
+        "mysql": "SELECT DISTINCT Pais FROM Clientes;"
+      }
+    },
+    {
+      "id": 22,
+      "dificultad": "avanzada",
+      "ordenado": false,
+      "enunciado": "Mostrar los 10 productos más vendidos, incluyendo los empates en el último registro.",
+      "solucion": {
+        "sqlserver": "SELECT TOP 10 WITH TIES IDProducto FROM [Detalles Pedido] GROUP BY IDProducto ORDER BY SUM(Cantidad) DESC;",
+        "mysql": "SELECT IDProducto FROM `Detalles Pedido` GROUP BY IDProducto HAVING SUM(Cantidad) IN (SELECT * FROM (SELECT SUM(Cantidad) FROM `Detalles Pedido` GROUP BY IDProducto ORDER BY SUM(Cantidad) DESC LIMIT 10) AS D) ORDER BY SUM(Cantidad) DESC;"
+      }
+    },
+    {
+      "id": 23,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Visualizar el máximo y mínimo precio de los productos por categoría; mostrar el nombre de la categoría.",
+      "solucion": {
+        "sqlserver": "SELECT C.NombreCategoria, MAX(PrecioUnitario) AS PrecioMaximo, MIN(PrecioUnitario) AS PrecioMinimo FROM Productos AS P JOIN Categorias C ON P.IDCategoria = C.IDCategoria GROUP BY C.NombreCategoria;",
+        "mysql": "SELECT C.NombreCategoria, MAX(PrecioUnitario) AS PrecioMaximo, MIN(PrecioUnitario) AS PrecioMinimo FROM Productos AS P JOIN Categorias C ON P.IDCategoria = C.IDCategoria GROUP BY C.NombreCategoria;"
+      }
+    },
+    {
+      "id": 24,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Visualizar el máximo y mínimo precio de los productos por proveedor; mostrar el nombre del proveedor.",
+      "solucion": {
+        "sqlserver": "SELECT S.NombreEmpresa, MAX(PrecioUnitario) AS PrecioMaximo, MIN(PrecioUnitario) AS PrecioMinimo FROM Productos AS P JOIN Proveedores AS S ON P.IDProveedor = S.IDProveedor GROUP BY S.NombreEmpresa;",
+        "mysql": "SELECT S.NombreEmpresa, MAX(PrecioUnitario) AS PrecioMaximo, MIN(PrecioUnitario) AS PrecioMinimo FROM Productos AS P JOIN Proveedores AS S ON P.IDProveedor = S.IDProveedor GROUP BY S.NombreEmpresa;"
+      }
+    },
+    {
+      "id": 25,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Seleccionar las categorías que tengan más de 5 productos. Mostrar el nombre de la categoría y el número de productos.",
+      "solucion": {
+        "sqlserver": "SELECT C.NombreCategoria, COUNT(P.IDProducto) AS CantidadProductos FROM Productos AS P JOIN Categorias C ON P.IDCategoria = C.IDCategoria GROUP BY C.NombreCategoria HAVING COUNT(P.IDProducto) > 5;",
+        "mysql": "SELECT C.NombreCategoria, COUNT(P.IDProducto) AS CantidadProductos FROM Productos AS P JOIN Categorias C ON P.IDCategoria = C.IDCategoria GROUP BY C.NombreCategoria HAVING COUNT(P.IDProducto) > 5;"
+      }
+    },
+    {
+      "id": 26,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Calcular cuántos clientes existen en cada país.",
+      "solucion": {
+        "sqlserver": "SELECT Pais, COUNT(IDCliente) AS CantidadClientes FROM Clientes GROUP BY Pais;",
+        "mysql": "SELECT Pais, COUNT(IDCliente) AS CantidadClientes FROM Clientes GROUP BY Pais;"
+      }
+    },
+    {
+      "id": 27,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Calcular cuántos clientes existen en cada ciudad.",
+      "solucion": {
+        "sqlserver": "SELECT Ciudad, COUNT(IDCliente) AS CantidadClientes FROM Clientes GROUP BY Ciudad;",
+        "mysql": "SELECT Ciudad, COUNT(IDCliente) AS CantidadClientes FROM Clientes GROUP BY Ciudad;"
+      }
+    },
+    {
+      "id": 28,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Calcular cuántos proveedores existen en cada ciudad y país.",
+      "solucion": {
+        "sqlserver": "SELECT Pais, Ciudad, COUNT(IDProveedor) AS CantidadProveedores FROM Proveedores GROUP BY Pais, Ciudad;",
+        "mysql": "SELECT Pais, Ciudad, COUNT(IDProveedor) AS CantidadProveedores FROM Proveedores GROUP BY Pais, Ciudad;"
+      }
+    },
+    {
+      "id": 29,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Calcular el stock total de los productos por cada categoría. Mostrar el nombre de la categoría y el stock por categoría.",
+      "solucion": {
+        "sqlserver": "SELECT C.NombreCategoria, SUM(UnidadesEnStock) AS Stock FROM Productos AS P JOIN Categorias AS C ON P.IDCategoria = C.IDCategoria GROUP BY C.NombreCategoria;",
+        "mysql": "SELECT C.NombreCategoria, SUM(UnidadesEnStock) AS Stock FROM Productos AS P JOIN Categorias AS C ON P.IDCategoria = C.IDCategoria GROUP BY C.NombreCategoria;"
+      }
+    },
+    {
+      "id": 30,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Mostrar el número de pedidos realizados por cada uno de los clientes por año.",
+      "solucion": {
+        "sqlserver": "SELECT IDCliente, YEAR(FechaPedido) AS Anio, COUNT(IDPedido) AS Cantidad FROM Pedidos GROUP BY IDCliente, YEAR(FechaPedido);",
+        "mysql": "SELECT IDCliente, YEAR(FechaPedido) AS Anio, COUNT(IDPedido) AS Cantidad FROM Pedidos GROUP BY IDCliente, YEAR(FechaPedido);"
+      }
+    },
+    {
+      "id": 31,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Calcular el stock total de los productos por cada categoría, solamente de las categorías 2, 5 y 8. Mostrar el nombre de la categoría y el stock.",
+      "solucion": {
+        "sqlserver": "SELECT C.NombreCategoria, SUM(UnidadesEnStock) AS Stock FROM Productos AS P JOIN Categorias AS C ON P.IDCategoria = C.IDCategoria WHERE C.IDCategoria IN (2, 5, 8) GROUP BY C.NombreCategoria;",
+        "mysql": "SELECT C.NombreCategoria, SUM(UnidadesEnStock) AS Stock FROM Productos AS P JOIN Categorias AS C ON P.IDCategoria = C.IDCategoria WHERE C.IDCategoria IN (2, 5, 8) GROUP BY C.NombreCategoria;"
+      }
+    },
+    {
+      "id": 32,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Obtener el nombre del cliente, nombre del proveedor, nombre del empleado y el nombre de los productos que están en el pedido 10250.",
+      "solucion": {
+        "sqlserver": "SELECT C.NombreEmpresa AS Cliente, S.NombreEmpresa AS Proveedor, CONCAT(E.Nombre, ' ', E.Apellido) AS Empleado, P.NombreProducto AS Producto FROM Pedidos AS O JOIN [Detalles Pedido] AS OD ON O.IDPedido = OD.IDPedido JOIN Productos AS P ON OD.IDProducto = P.IDProducto JOIN Proveedores AS S ON P.IDProveedor = S.IDProveedor JOIN Clientes AS C ON O.IDCliente = C.IDCliente JOIN Empleados AS E ON O.IDEmpleado = E.IDEmpleado WHERE O.IDPedido = 10250;",
+        "mysql": "SELECT C.NombreEmpresa AS Cliente, S.NombreEmpresa AS Proveedor, CONCAT(E.Nombre, ' ', E.Apellido) AS Empleado, P.NombreProducto AS Producto FROM Pedidos AS O JOIN `Detalles Pedido` AS OD ON O.IDPedido = OD.IDPedido JOIN Productos AS P ON OD.IDProducto = P.IDProducto JOIN Proveedores AS S ON P.IDProveedor = S.IDProveedor JOIN Clientes AS C ON O.IDCliente = C.IDCliente JOIN Empleados AS E ON O.IDEmpleado = E.IDEmpleado WHERE O.IDPedido = 10250;"
+      }
+    },
+    {
+      "id": 33,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Mostrar el número de pedidos realizados por cada uno de los empleados en cada año.",
+      "solucion": {
+        "sqlserver": "SELECT IDEmpleado, YEAR(FechaPedido) AS Anio, COUNT(IDPedido) AS Cantidad FROM Pedidos GROUP BY IDEmpleado, YEAR(FechaPedido);",
+        "mysql": "SELECT IDEmpleado, YEAR(FechaPedido) AS Anio, COUNT(IDPedido) AS Cantidad FROM Pedidos GROUP BY IDEmpleado, YEAR(FechaPedido);"
+      }
+    },
+    {
+      "id": 34,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Mostrar el número de pedidos realizados por cada uno de los clientes por cada mes y año.",
+      "solucion": {
+        "sqlserver": "SELECT IDCliente, YEAR(FechaPedido) AS Anio, MONTH(FechaPedido) AS Mes, COUNT(IDPedido) AS Cantidad FROM Pedidos GROUP BY IDCliente, YEAR(FechaPedido), MONTH(FechaPedido);",
+        "mysql": "SELECT IDCliente, YEAR(FechaPedido) AS Anio, MONTH(FechaPedido) AS Mes, COUNT(IDPedido) AS Cantidad FROM Pedidos GROUP BY IDCliente, YEAR(FechaPedido), MONTH(FechaPedido);"
+      }
+    },
+    {
+      "id": 35,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Contar el número de pedidos que se han realizado por año y mes.",
+      "solucion": {
+        "sqlserver": "SELECT YEAR(FechaPedido) AS Anio, MONTH(FechaPedido) AS Mes, COUNT(IDPedido) AS Cantidad FROM Pedidos GROUP BY YEAR(FechaPedido), MONTH(FechaPedido);",
+        "mysql": "SELECT YEAR(FechaPedido) AS Anio, MONTH(FechaPedido) AS Mes, COUNT(IDPedido) AS Cantidad FROM Pedidos GROUP BY YEAR(FechaPedido), MONTH(FechaPedido);"
+      }
+    },
+    {
+      "id": 36,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Seleccionar el nombre de la empresa del cliente, el código del pedido, la fecha del pedido, código del producto, cantidad pedida, nombre del producto, nombre de la empresa proveedora y la ciudad del proveedor.",
+      "solucion": {
+        "sqlserver": "SELECT C.NombreEmpresa AS Cliente, O.IDPedido, O.FechaPedido, P.IDProducto, OD.Cantidad, P.NombreProducto AS Producto, S.NombreEmpresa AS Proveedor, S.Ciudad FROM Pedidos AS O JOIN [Detalles Pedido] AS OD ON O.IDPedido = OD.IDPedido JOIN Productos AS P ON OD.IDProducto = P.IDProducto JOIN Proveedores AS S ON P.IDProveedor = S.IDProveedor JOIN Clientes AS C ON O.IDCliente = C.IDCliente;",
+        "mysql": "SELECT C.NombreEmpresa AS Cliente, O.IDPedido, O.FechaPedido, P.IDProducto, OD.Cantidad, P.NombreProducto AS Producto, S.NombreEmpresa AS Proveedor, S.Ciudad FROM Pedidos AS O JOIN `Detalles Pedido` AS OD ON O.IDPedido = OD.IDPedido JOIN Productos AS P ON OD.IDProducto = P.IDProducto JOIN Proveedores AS S ON P.IDProveedor = S.IDProveedor JOIN Clientes AS C ON O.IDCliente = C.IDCliente;"
+      }
+    },
+    {
+      "id": 37,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Seleccionar el nombre de la empresa del cliente, nombre del contacto, código del pedido, fecha del pedido, código del producto, cantidad pedida, nombre del producto y nombre de la empresa proveedora, usando JOIN. Solamente las empresas proveedoras que comienzan con las letras A hasta la G, y la cantidad pedida debe estar entre 18 y 190.",
+      "solucion": {
+        "sqlserver": "SELECT C.NombreEmpresa AS Cliente, C.NombreContacto, O.IDPedido, O.FechaPedido, P.IDProducto, OD.Cantidad, P.NombreProducto AS Producto, S.NombreEmpresa AS Proveedor FROM Pedidos AS O JOIN [Detalles Pedido] AS OD ON O.IDPedido = OD.IDPedido JOIN Productos AS P ON OD.IDProducto = P.IDProducto JOIN Proveedores AS S ON P.IDProveedor = S.IDProveedor JOIN Clientes AS C ON O.IDCliente = C.IDCliente WHERE S.NombreEmpresa < 'H' AND OD.Cantidad BETWEEN 18 AND 190;",
+        "mysql": "SELECT C.NombreEmpresa AS Cliente, C.NombreContacto, O.IDPedido, O.FechaPedido, P.IDProducto, OD.Cantidad, P.NombreProducto AS Producto, S.NombreEmpresa AS Proveedor FROM Pedidos AS O JOIN `Detalles Pedido` AS OD ON O.IDPedido = OD.IDPedido JOIN Productos AS P ON OD.IDProducto = P.IDProducto JOIN Proveedores AS S ON P.IDProveedor = S.IDProveedor JOIN Clientes AS C ON O.IDCliente = C.IDCliente WHERE S.NombreEmpresa < 'H' AND OD.Cantidad BETWEEN 18 AND 190;"
+      }
+    },
+    {
+      "id": 38,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Seleccionar cuántos proveedores hay en cada país, considerando solo los nombres de proveedores que comienzan con las letras E hasta la P, y mostrando solo los países con más de 2 proveedores.",
+      "solucion": {
+        "sqlserver": "SELECT Pais, COUNT(IDProveedor) AS Cantidad FROM Proveedores WHERE NombreEmpresa >= 'E' AND NombreEmpresa < 'Q' GROUP BY Pais HAVING COUNT(IDProveedor) > 2;",
+        "mysql": "SELECT Pais, COUNT(IDProveedor) AS Cantidad FROM Proveedores WHERE NombreEmpresa >= 'E' AND NombreEmpresa < 'Q' GROUP BY Pais HAVING COUNT(IDProveedor) > 2;"
+      }
+    },
+    {
+      "id": 39,
+      "dificultad": "avanzada",
+      "ordenado": true,
+      "enunciado": "Obtener el número de productos por cada categoría. Mostrar el nombre de la categoría, el nombre del producto y el total de productos por categoría, solamente de las categorías 3, 5 y 8. Ordenar por el nombre de la categoría.",
+      "solucion": {
+        "sqlserver": "SELECT C.NombreCategoria, P.NombreProducto, (SELECT COUNT(*) FROM Productos AS PS WHERE PS.IDCategoria = P.IDCategoria) AS CantCategoria FROM Productos AS P JOIN Categorias AS C ON P.IDCategoria = C.IDCategoria WHERE P.IDCategoria IN (3, 5, 8) ORDER BY NombreCategoria;",
+        "mysql": "SELECT C.NombreCategoria, P.NombreProducto, (SELECT COUNT(*) FROM Productos AS PS WHERE PS.IDCategoria = P.IDCategoria) AS CantCategoria FROM Productos AS P JOIN Categorias AS C ON P.IDCategoria = C.IDCategoria WHERE P.IDCategoria IN (3, 5, 8) ORDER BY NombreCategoria;"
+      }
+    },
+    {
+      "id": 40,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Mostrar el número del pedido, la fecha del pedido y el importe total de cada pedido.",
+      "solucion": {
+        "sqlserver": "SELECT O.IDPedido, O.FechaPedido, SUM(OD.Cantidad * OD.PrecioUnitario * (1 - OD.Descuento)) AS Total FROM Pedidos AS O JOIN [Detalles Pedido] AS OD ON O.IDPedido = OD.IDPedido GROUP BY O.IDPedido, O.FechaPedido;",
+        "mysql": "SELECT O.IDPedido, O.FechaPedido, SUM(OD.Cantidad * OD.PrecioUnitario * (1 - OD.Descuento)) AS Total FROM Pedidos AS O JOIN `Detalles Pedido` AS OD ON O.IDPedido = OD.IDPedido GROUP BY O.IDPedido, O.FechaPedido;"
+      }
+    },
+    {
+      "id": 41,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Mostrar el nombre del producto y en cuántos pedidos de compra se encuentra.",
+      "solucion": {
+        "sqlserver": "SELECT P.NombreProducto, COUNT(DISTINCT OD.IDPedido) AS CantidadPedidos FROM [Detalles Pedido] AS OD JOIN Productos AS P ON OD.IDProducto = P.IDProducto GROUP BY P.NombreProducto;",
+        "mysql": "SELECT P.NombreProducto, COUNT(DISTINCT OD.IDPedido) AS CantidadPedidos FROM `Detalles Pedido` AS OD JOIN Productos AS P ON OD.IDProducto = P.IDProducto GROUP BY P.NombreProducto;"
+      }
+    },
+    {
+      "id": 42,
+      "dificultad": "avanzada",
+      "ordenado": false,
+      "enunciado": "Mostrar los productos cuyo precio es mayor al promedio de precio de todos los productos.",
+      "solucion": {
+        "sqlserver": "SELECT IDProducto, NombreProducto, IDProveedor, IDCategoria, CantidadPorUnidad, PrecioUnitario, UnidadesEnStock, UnidadesEnPedidos, NivelNuevoPedido, Discontinuado FROM Productos WHERE PrecioUnitario > (SELECT AVG(PrecioUnitario) FROM Productos);",
+        "mysql": "SELECT IDProducto, NombreProducto, IDProveedor, IDCategoria, CantidadPorUnidad, PrecioUnitario, UnidadesEnStock, UnidadesEnPedidos, NivelNuevoPedido, Discontinuado FROM Productos WHERE PrecioUnitario > (SELECT AVG(PrecioUnitario) FROM Productos);"
+      }
+    },
+    {
+      "id": 43,
+      "dificultad": "avanzada",
+      "ordenado": false,
+      "enunciado": "¿Qué empleados no tienen como jefe al empleado cuyo apellido es Buchanan? Mostrar ID, y saludo, nombre y apellido concatenados.",
+      "solucion": {
+        "sqlserver": "SELECT IDEmpleado, CONCAT(Saludo, ' ', Nombre, ' ', Apellido) AS NombreCompleto FROM Empleados WHERE JefeID IS NULL OR JefeID NOT IN (SELECT IDEmpleado FROM Empleados WHERE Apellido = 'Buchanan') AND Apellido <> 'Buchanan';",
+        "mysql": "SELECT IDEmpleado, CONCAT(Saludo, ' ', Nombre, ' ', Apellido) AS NombreCompleto FROM Empleados WHERE JefeID IS NULL OR JefeID NOT IN (SELECT IDEmpleado FROM Empleados WHERE Apellido = 'Buchanan') AND Apellido <> 'Buchanan';"
+      }
+    },
+    {
+      "id": 44,
+      "dificultad": "avanzada",
+      "ordenado": false,
+      "enunciado": "Armar parejas de representantes de ventas de Estados Unidos (EE.UU.), sin repetir parejas. De cada empleado mostrar concatenados el saludo, nombre y apellido.",
+      "solucion": {
+        "sqlserver": "SELECT CONCAT(E1.Saludo, ' ', E1.Nombre, ' ', E1.Apellido) AS Empleado1, CONCAT(E2.Saludo, ' ', E2.Nombre, ' ', E2.Apellido) AS Empleado2 FROM Empleados E1 JOIN Empleados E2 ON E1.IDEmpleado < E2.IDEmpleado WHERE E1.Pais = 'EE.UU.' AND E2.Pais = 'EE.UU.' AND E1.Puesto = 'Representante de ventas' AND E2.Puesto = 'Representante de ventas';",
+        "mysql": "SELECT CONCAT(E1.Saludo, ' ', E1.Nombre, ' ', E1.Apellido) AS Empleado1, CONCAT(E2.Saludo, ' ', E2.Nombre, ' ', E2.Apellido) AS Empleado2 FROM Empleados E1 JOIN Empleados E2 ON E1.IDEmpleado < E2.IDEmpleado WHERE E1.Pais = 'EE.UU.' AND E2.Pais = 'EE.UU.' AND E1.Puesto = 'Representante de ventas' AND E2.Puesto = 'Representante de ventas';"
+      }
+    },
+    {
+      "id": 45,
+      "dificultad": "avanzada",
+      "ordenado": true,
+      "enunciado": "¿Qué clientes compraron productos suministrados por proveedores que residen en la misma región que ellos? Mostrar ID, nombre de la empresa, nombre del contacto y región. Incluir aquellos cuya región es NULL si la región del proveedor también es NULL. Ordenar por región.",
+      "solucion": {
+        "sqlserver": "SELECT DISTINCT C.IDCliente, C.NombreEmpresa, C.NombreContacto, C.Region FROM Clientes C JOIN Pedidos P ON C.IDCliente = P.IDCliente JOIN [Detalles Pedido] DP ON P.IDPedido = DP.IDPedido JOIN Productos PR ON DP.IDProducto = PR.IDProducto JOIN Proveedores PV ON PR.IDProveedor = PV.IDProveedor WHERE (C.Region = PV.Region OR (C.Region IS NULL AND PV.Region IS NULL)) ORDER BY C.Region;",
+        "mysql": "SELECT DISTINCT C.IDCliente, C.NombreEmpresa, C.NombreContacto, C.Region FROM Clientes C JOIN Pedidos P ON C.IDCliente = P.IDCliente JOIN `Detalles Pedido` DP ON P.IDPedido = DP.IDPedido JOIN Productos PR ON DP.IDProducto = PR.IDProducto JOIN Proveedores PV ON PR.IDProveedor = PV.IDProveedor WHERE (C.Region = PV.Region OR (C.Region IS NULL AND PV.Region IS NULL)) ORDER BY C.Region;"
+      }
+    },
+    {
+      "id": 46,
+      "dificultad": "avanzada",
+      "ordenado": true,
+      "enunciado": "Listar los productos (ID, nombre, precio unitario y nombre de su categoría) cuyo precio unitario está por encima del precio promedio de su categoría. Ordenar por nombre de categoría y nombre de producto.",
+      "solucion": {
+        "sqlserver": "SELECT P.IDProducto, P.NombreProducto, P.PrecioUnitario, C.NombreCategoria FROM Productos P JOIN Categorias C ON P.IDCategoria = C.IDCategoria WHERE P.PrecioUnitario > (SELECT AVG(P2.PrecioUnitario) FROM Productos P2 WHERE P2.IDCategoria = P.IDCategoria) ORDER BY C.NombreCategoria, P.NombreProducto;",
+        "mysql": "SELECT P.IDProducto, P.NombreProducto, P.PrecioUnitario, C.NombreCategoria FROM Productos P JOIN Categorias C ON P.IDCategoria = C.IDCategoria WHERE P.PrecioUnitario > (SELECT AVG(P2.PrecioUnitario) FROM Productos P2 WHERE P2.IDCategoria = P.IDCategoria) ORDER BY C.NombreCategoria, P.NombreProducto;"
+      }
+    },
+    {
+      "id": 47,
+      "dificultad": "avanzada",
+      "ordenado": true,
+      "enunciado": "Listar los proveedores junto con el producto más caro que suministran. Mostrar ID del proveedor, nombre de la empresa, ID del producto y nombre del producto. Ordenar por nombre de la empresa proveedora.",
+      "solucion": {
+        "sqlserver": "SELECT PV.IDProveedor, PV.NombreEmpresa, P.IDProducto, P.NombreProducto FROM Proveedores PV JOIN Productos P ON PV.IDProveedor = P.IDProveedor WHERE P.PrecioUnitario = (SELECT MAX(P2.PrecioUnitario) FROM Productos P2 WHERE P2.IDProveedor = PV.IDProveedor) ORDER BY PV.NombreEmpresa;",
+        "mysql": "SELECT PV.IDProveedor, PV.NombreEmpresa, P.IDProducto, P.NombreProducto FROM Proveedores PV JOIN Productos P ON PV.IDProveedor = P.IDProveedor WHERE P.PrecioUnitario = (SELECT MAX(P2.PrecioUnitario) FROM Productos P2 WHERE P2.IDProveedor = PV.IDProveedor) ORDER BY PV.NombreEmpresa;"
+      }
+    },
+    {
+      "id": 48,
+      "dificultad": "avanzada",
+      "ordenado": false,
+      "enunciado": "Armar un reporte con las ciudades y la cantidad de pedidos despachados a cada una. Deben aparecer todas las ciudades de la base; las que no recibieron pedidos deben figurar con cantidad cero.",
+      "solucion": {
+        "sqlserver": "SELECT C.Ciudad, COUNT(PD.IDPedido) AS CantidadPedidos FROM (SELECT Ciudad FROM Clientes UNION SELECT Ciudad FROM Proveedores UNION SELECT Ciudad FROM Empleados UNION SELECT CiudadEnvio FROM Pedidos) AS C LEFT JOIN Pedidos PD ON C.Ciudad = PD.CiudadEnvio GROUP BY C.Ciudad ORDER BY C.Ciudad;",
+        "mysql": "SELECT C.Ciudad, COUNT(PD.IDPedido) AS CantidadPedidos FROM (SELECT Ciudad FROM Clientes UNION SELECT Ciudad FROM Proveedores UNION SELECT Ciudad FROM Empleados UNION SELECT CiudadEnvio FROM Pedidos) AS C LEFT JOIN Pedidos PD ON C.Ciudad = PD.CiudadEnvio GROUP BY C.Ciudad ORDER BY C.Ciudad;"
+      }
+    },
+    {
+      "id": 49,
+      "dificultad": "avanzada",
+      "ordenado": false,
+      "enunciado": "Armar un reporte de los pedidos despachados, agrupados por día de la semana del despacho (lunes, martes, etc.).",
+      "solucion": {
+        "sqlserver": "SELECT DATENAME(WEEKDAY, FechaEnvio) AS DiaSemana, COUNT(IDPedido) AS CantidadPedidos FROM Pedidos WHERE FechaEnvio IS NOT NULL GROUP BY DATENAME(WEEKDAY, FechaEnvio), DATEPART(WEEKDAY, FechaEnvio) ORDER BY DATEPART(WEEKDAY, FechaEnvio);",
+        "mysql": "SELECT DAYNAME(FechaEnvio) AS DiaSemana, COUNT(IDPedido) AS CantidadPedidos FROM Pedidos WHERE FechaEnvio IS NOT NULL GROUP BY DAYNAME(FechaEnvio), DAYOFWEEK(FechaEnvio) ORDER BY DAYOFWEEK(FechaEnvio);"
+      }
+    },
+    {
+      "id": 50,
+      "dificultad": "avanzada",
+      "ordenado": true,
+      "enunciado": "Listar los clientes de España que realizaron pedidos durante 2020. Mostrar TODOS los clientes de España: para los que pidieron en 2020, mostrar el nombre del último mes con pedido; para los demás, mostrar 'Sin Pedidos'. Ordenar por nombre de la empresa.",
+      "solucion": {
+        "sqlserver": "SELECT C.NombreEmpresa, CASE MAX(MONTH(P.FechaPedido)) WHEN 1 THEN 'Enero' WHEN 2 THEN 'Febrero' WHEN 3 THEN 'Marzo' WHEN 4 THEN 'Abril' WHEN 5 THEN 'Mayo' WHEN 6 THEN 'Junio' WHEN 7 THEN 'Julio' WHEN 8 THEN 'Agosto' WHEN 9 THEN 'Septiembre' WHEN 10 THEN 'Octubre' WHEN 11 THEN 'Noviembre' WHEN 12 THEN 'Diciembre' ELSE 'Sin Pedidos' END AS MesUltimaOrden FROM Clientes AS C LEFT JOIN Pedidos AS P ON C.IDCliente = P.IDCliente AND P.FechaPedido >= '20200101' AND P.FechaPedido < '20210101' WHERE C.Pais = 'España' GROUP BY C.NombreEmpresa ORDER BY C.NombreEmpresa;",
+        "mysql": "SELECT C.NombreEmpresa, CASE MAX(MONTH(P.FechaPedido)) WHEN 1 THEN 'Enero' WHEN 2 THEN 'Febrero' WHEN 3 THEN 'Marzo' WHEN 4 THEN 'Abril' WHEN 5 THEN 'Mayo' WHEN 6 THEN 'Junio' WHEN 7 THEN 'Julio' WHEN 8 THEN 'Agosto' WHEN 9 THEN 'Septiembre' WHEN 10 THEN 'Octubre' WHEN 11 THEN 'Noviembre' WHEN 12 THEN 'Diciembre' ELSE 'Sin Pedidos' END AS MesUltimaOrden FROM Clientes AS C LEFT JOIN Pedidos AS P ON C.IDCliente = P.IDCliente AND P.FechaPedido >= '2020-01-01' AND P.FechaPedido < '2021-01-01' WHERE C.Pais = 'España' GROUP BY C.NombreEmpresa ORDER BY C.NombreEmpresa;"
+      }
+    }
+  ]
+}

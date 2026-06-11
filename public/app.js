@@ -6,8 +6,16 @@ const errorEl = document.getElementById('error');
 const tableWrapEl = document.getElementById('tableWrap');
 const schemaTreeEl = document.getElementById('schemaTree');
 const historyListEl = document.getElementById('historyList');
+const exerciseListEl = document.getElementById('exerciseList');
 const tabSchemaEl = document.getElementById('tabSchema');
 const tabHistoryEl = document.getElementById('tabHistory');
+const tabExercisesEl = document.getElementById('tabExercises');
+const exerciseBoxEl = document.getElementById('exerciseBox');
+const exerciseTitleEl = document.getElementById('exerciseTitle');
+const exerciseStatementEl = document.getElementById('exerciseStatement');
+const exerciseCloseEl = document.getElementById('exerciseClose');
+const verifyBtnEl = document.getElementById('verifyBtn');
+const verdictEl = document.getElementById('verdict');
 
 let appSettings = { readOnlyMode: null };
 let editor = null;
@@ -33,6 +41,10 @@ const defaultConnections = {
 
 const HISTORY_KEY = 'websql_query_history';
 const HISTORY_MAX = 25;
+const EXERCISES_DONE_KEY = 'websql_exercises_done';
+
+let exercises = [];
+let activeExercise = null;
 
 // Dialect-specific keyword/function lists
 const KEYWORDS = {
@@ -411,12 +423,182 @@ function renderHistory() {
   }
 }
 
-function switchSideTab(tab) {
-  const isSchema = tab === 'schema';
-  tabSchemaEl.classList.toggle('active', isSchema);
-  tabHistoryEl.classList.toggle('active', !isSchema);
-  schemaTreeEl.classList.toggle('hidden', !isSchema);
-  historyListEl.classList.toggle('hidden', isSchema);
+const sideTabs = [
+  { name: 'schema', btn: tabSchemaEl, panel: schemaTreeEl },
+  { name: 'exercises', btn: tabExercisesEl, panel: exerciseListEl },
+  { name: 'history', btn: tabHistoryEl, panel: historyListEl }
+];
+
+function switchSideTab(name) {
+  for (const tab of sideTabs) {
+    tab.btn.classList.toggle('active', tab.name === name);
+    tab.panel.classList.toggle('hidden', tab.name !== name);
+  }
+}
+
+// ---------- Ejercicios ----------
+
+function loadExercisesDone() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(EXERCISES_DONE_KEY) || '{}');
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (_e) {
+    return {};
+  }
+}
+
+function markExerciseDone(id) {
+  const done = loadExercisesDone();
+  done[id] = true;
+  try {
+    localStorage.setItem(EXERCISES_DONE_KEY, JSON.stringify(done));
+  } catch (_e) {
+    // el progreso es opcional
+  }
+  renderExerciseList();
+}
+
+async function loadExercises() {
+  try {
+    const response = await fetch('/api/exercises');
+    if (!response.ok) throw new Error('No se pudieron cargar los ejercicios');
+    const data = await response.json();
+    exercises = Array.isArray(data.exercises) ? data.exercises : [];
+  } catch (_e) {
+    exercises = [];
+  }
+  renderExerciseList();
+}
+
+function renderExerciseList() {
+  if (!exercises.length) {
+    exerciseListEl.innerHTML = '<p class="side-empty">No hay ejercicios cargados.</p>';
+    return;
+  }
+
+  const done = loadExercisesDone();
+  const doneCount = exercises.filter((ex) => done[ex.id]).length;
+
+  exerciseListEl.innerHTML = '';
+
+  const progressEl = document.createElement('p');
+  progressEl.className = 'exercise-progress';
+  progressEl.textContent = `${doneCount}/${exercises.length} resueltos`;
+  exerciseListEl.appendChild(progressEl);
+
+  for (const exercise of exercises) {
+    const itemEl = document.createElement('button');
+    itemEl.type = 'button';
+    itemEl.className = 'exercise-item'
+      + (done[exercise.id] ? ' exercise-done' : '')
+      + (activeExercise && activeExercise.id === exercise.id ? ' exercise-active' : '');
+    const check = done[exercise.id] ? '✔ ' : '';
+    itemEl.innerHTML = `
+      <span class="exercise-item-head">${check}Ejercicio ${exercise.id} <span class="exercise-badge badge-${escapeHtml(normalizeDifficulty(exercise.dificultad))}">${escapeHtml(exercise.dificultad)}</span></span>
+      <span class="exercise-snippet">${escapeHtml(exercise.enunciado.length > 90 ? exercise.enunciado.slice(0, 90) + '…' : exercise.enunciado)}</span>
+    `;
+    itemEl.title = exercise.enunciado;
+    itemEl.addEventListener('click', () => selectExercise(exercise));
+    exerciseListEl.appendChild(itemEl);
+  }
+}
+
+function normalizeDifficulty(dificultad) {
+  const value = String(dificultad || '').toLowerCase();
+  if (value.startsWith('b')) return 'basica';
+  if (value.startsWith('m')) return 'media';
+  return 'avanzada';
+}
+
+function selectExercise(exercise) {
+  activeExercise = exercise;
+  exerciseTitleEl.textContent = `Ejercicio ${exercise.id} · ${exercise.dificultad}`;
+  exerciseStatementEl.textContent = exercise.enunciado;
+  exerciseBoxEl.classList.remove('hidden');
+  verifyBtnEl.classList.remove('hidden');
+  updateVerifyAvailability();
+  renderExerciseList();
+  if (editor) editor.focus();
+}
+
+function closeExercise() {
+  activeExercise = null;
+  exerciseBoxEl.classList.add('hidden');
+  verifyBtnEl.classList.add('hidden');
+  renderExerciseList();
+}
+
+function updateVerifyAvailability() {
+  if (!activeExercise) return;
+  const platform = platformEl.value;
+  const supported = (activeExercise.plataformas || []).includes(platform);
+  verifyBtnEl.disabled = !supported;
+  verifyBtnEl.title = supported
+    ? 'Compara tu resultado con el esperado'
+    : 'Este ejercicio no tiene solución cargada para la plataforma elegida';
+}
+
+function renderVerdict(correcto, feedback, advertencias) {
+  verdictEl.classList.remove('hidden', 'verdict-ok', 'verdict-fail');
+  verdictEl.classList.add(correcto ? 'verdict-ok' : 'verdict-fail');
+
+  const warnings = (advertencias || [])
+    .map((msg) => `<p class="verdict-warning">⚠ ${escapeHtml(msg)}</p>`)
+    .join('');
+
+  if (correcto) {
+    verdictEl.innerHTML = '<strong>✔ ¡Correcto!</strong> Tu consulta devuelve el resultado esperado.' + warnings;
+    return;
+  }
+  const items = (feedback || []).map((msg) => `<li>${escapeHtml(msg)}</li>`).join('');
+  verdictEl.innerHTML = `<strong>✘ Todavía no.</strong><ul>${items}</ul>` + warnings;
+}
+
+async function verifyExercise() {
+  if (!activeExercise) return;
+  clearState();
+  verifyBtnEl.disabled = true;
+  verifyBtnEl.textContent = 'Verificando...';
+
+  const queryText = editor ? editor.getValue() : '';
+  const platform = platformEl.value;
+
+  try {
+    const statements = splitSqlStatements(queryText);
+    if (statements.length !== 1) {
+      throw new Error('Solo se permite verificar una consulta por vez.');
+    }
+
+    const response = await fetch(`/api/exercises/${activeExercise.id}/check`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ platform, query: queryText })
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'No se pudo verificar la consulta');
+
+    renderVerdict(data.correcto, data.feedback, data.advertencias);
+
+    const rowsLabel = data.truncated
+      ? `Filas: ${data.rowCount} (mostrando las primeras ${data.rows.length})`
+      : `Filas: ${data.rowCount}`;
+    metaEl.textContent = `Ejercicio ${data.exerciseId} | Plataforma: ${data.platform} | ${rowsLabel} | Tiempo total: ${data.durationMs} ms`;
+    renderRows(data.columns || [], data.rows || []);
+
+    if (data.correcto) {
+      markExerciseDone(activeExercise.id);
+    }
+    saveToHistory(queryText, platform, true);
+  } catch (error) {
+    errorEl.classList.remove('hidden');
+    errorEl.textContent = error.message;
+    saveToHistory(queryText, platform, false);
+  } finally {
+    verifyBtnEl.disabled = false;
+    verifyBtnEl.textContent = 'Verificar';
+    updateVerifyAvailability();
+  }
 }
 
 const schemaFetchesInFlight = {};
@@ -479,6 +661,8 @@ function renderRows(columns, rows) {
 function clearState() {
   errorEl.classList.add('hidden');
   errorEl.textContent = '';
+  verdictEl.classList.add('hidden');
+  verdictEl.innerHTML = '';
   tableWrapEl.innerHTML = '';
   metaEl.textContent = '';
 }
@@ -728,12 +912,19 @@ function initMonaco() {
   });
 }
 
-platformEl.addEventListener('change', renderConnectionInfo);
+platformEl.addEventListener('change', () => {
+  renderConnectionInfo();
+  updateVerifyAvailability();
+});
 executeBtnEl.addEventListener('click', executeQuery);
+verifyBtnEl.addEventListener('click', verifyExercise);
+exerciseCloseEl.addEventListener('click', closeExercise);
 tabSchemaEl.addEventListener('click', () => switchSideTab('schema'));
+tabExercisesEl.addEventListener('click', () => switchSideTab('exercises'));
 tabHistoryEl.addEventListener('click', () => switchSideTab('history'));
 
 renderConnectionInfo();
 loadSettings();
 renderHistory();
+loadExercises();
 initMonaco();
