@@ -131,6 +131,20 @@ select:focus {
   border-color: var(--line) !important;
 }
 
+.field-row-split {
+  display: flex;
+  gap: 10px;
+}
+
+.field-row-split > div {
+  flex: 1;
+}
+
+select[disabled] {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
 .badge-row {
   display: flex;
   gap: 10px;
