@@ -1,4 +1,5 @@
 const platformEl = document.getElementById('platform');
+const databaseEl = document.getElementById('database');
 const connectionInfoEl = document.getElementById('connectionInfo');
 const executeBtnEl = document.getElementById('executeBtn');
 const metaEl = document.getElementById('meta');
@@ -21,23 +22,55 @@ let appSettings = { readOnlyMode: null };
 let editor = null;
 const schemaCache = {};
 
+const databasesByPlatform = {
+  sqlserver: ['pampero', 'library'],
+  mysql: ['pampero'],
+  postgresql: ['pampero']
+};
+
 const defaultConnections = {
-  sqlserver: {
+  'sqlserver:pampero': {
     host: 'msjoi.database.windows.net',
     database: 'pampero',
     user: 'unpazuser'
   },
-  mysql: {
+  'sqlserver:library': {
+    host: 'msjoi.database.windows.net',
+    database: 'library',
+    user: 'unpazuser2'
+  },
+  'mysql:pampero': {
     host: 'myjoi.mysql.database.azure.com',
     database: 'pampero',
     user: 'unpazuser'
   },
-  postgresql: {
+  'postgresql:pampero': {
     host: 'pgjoi.postgres.database.azure.com',
     database: 'pampero',
     user: 'unpazuser'
   }
 };
+
+function currentConnectionKey() {
+  return `${platformEl.value}:${databaseEl.value}`;
+}
+
+function updateDatabaseOptions() {
+  const platform = platformEl.value;
+  const available = databasesByPlatform[platform] || ['pampero'];
+  const previous = databaseEl.value;
+
+  databaseEl.innerHTML = '';
+  for (const db of available) {
+    const option = document.createElement('option');
+    option.value = db;
+    option.textContent = db;
+    databaseEl.appendChild(option);
+  }
+
+  databaseEl.value = available.includes(previous) ? previous : 'pampero';
+  databaseEl.disabled = available.length === 1;
+}
 
 const HISTORY_KEY = 'websql_query_history';
 const HISTORY_MAX = 25;
@@ -287,12 +320,14 @@ function escapeHtml(value) {
 }
 
 function renderConnectionInfo() {
-  const platform = platformEl.value;
-  const info = defaultConnections[platform];
-  connectionInfoEl.textContent = `Servidor: ${info.host} | Base: ${info.database} | Usuario: ${info.user}`;
+  const key = currentConnectionKey();
+  const info = defaultConnections[key];
+  connectionInfoEl.textContent = info
+    ? `Servidor: ${info.host} | Base: ${info.database} | Usuario: ${info.user}`
+    : '';
   renderSchemaExplorer();
-  prefetchSchema(platform).then(() => {
-    if (platformEl.value === platform) renderSchemaExplorer();
+  prefetchSchema(platformEl.value, databaseEl.value).then(() => {
+    if (currentConnectionKey() === key) renderSchemaExplorer();
   });
 }
 
@@ -305,8 +340,7 @@ function insertIntoEditor(text) {
 }
 
 function renderSchemaExplorer() {
-  const platform = platformEl.value;
-  const schemaData = schemaCache[platform];
+  const schemaData = schemaCache[currentConnectionKey()];
 
   if (!schemaData) {
     schemaTreeEl.innerHTML = '<p class="side-empty">Cargando esquema...</p>';
@@ -326,10 +360,19 @@ function renderSchemaExplorer() {
     const tableEl = document.createElement('div');
     tableEl.className = 'tree-table';
 
+    // Prefijo de esquema solo cuando no es el default del motor
+    const platform = platformEl.value;
+    const defaultSchemas = platform === 'sqlserver' ? ['dbo'] : platform === 'postgresql' ? ['public'] : [databaseEl.value];
+    const showSchema = table.schema && !defaultSchemas.includes(table.schema);
+    const displayName = showSchema ? `${table.schema}.${table.name}` : table.name;
+    const qualifiedName = showSchema
+      ? `${quoteIdentifier(table.schema, platform)}.${quoteIdentifier(table.name, platform)}`
+      : quoteIdentifier(table.name, platform);
+
     const headEl = document.createElement('button');
     headEl.type = 'button';
     headEl.className = 'tree-table-head';
-    headEl.innerHTML = `<span class="tree-caret">▸</span> ${escapeHtml(table.name)}`;
+    headEl.innerHTML = `<span class="tree-caret">▸</span> ${escapeHtml(displayName)}`;
     headEl.title = 'Clic: ver columnas · Doble clic: insertar en el editor';
 
     const colsEl = document.createElement('div');
@@ -348,7 +391,7 @@ function renderSchemaExplorer() {
       colsEl.classList.toggle('hidden');
       headEl.querySelector('.tree-caret').textContent = colsEl.classList.contains('hidden') ? '▸' : '▾';
     });
-    headEl.addEventListener('dblclick', () => insertIntoEditor(quoteIdentifier(table.name, platformEl.value)));
+    headEl.addEventListener('dblclick', () => insertIntoEditor(qualifiedName));
 
     tableEl.appendChild(headEl);
     tableEl.appendChild(colsEl);
@@ -368,14 +411,15 @@ function loadHistory() {
   }
 }
 
-function saveToHistory(sql, platform, success) {
+function saveToHistory(sql, platform, success, database) {
   const trimmed = String(sql || '').trim();
   if (!trimmed) return;
+  const db = database || 'pampero';
 
   let history = loadHistory();
-  // Evitar duplicados consecutivos de la misma consulta y plataforma
-  history = history.filter((item) => !(item.sql === trimmed && item.platform === platform));
-  history.unshift({ sql: trimmed, platform, success, ts: Date.now() });
+  // Evitar duplicados de la misma consulta, plataforma y base
+  history = history.filter((item) => !(item.sql === trimmed && item.platform === platform && (item.database || 'pampero') === db));
+  history.unshift({ sql: trimmed, platform, database: db, success, ts: Date.now() });
   if (history.length > HISTORY_MAX) history = history.slice(0, HISTORY_MAX);
 
   try {
@@ -406,14 +450,18 @@ function renderHistory() {
     const itemEl = document.createElement('button');
     itemEl.type = 'button';
     itemEl.className = 'history-item' + (item.success ? '' : ' history-failed');
+    const dbLabel = (item.database || 'pampero') === 'pampero' ? '' : ` · ${escapeHtml(item.database)}`;
     itemEl.innerHTML = `
-      <span class="history-meta">${escapeHtml(item.platform)} · ${formatHistoryTime(item.ts)}${item.success ? '' : ' · falló'}</span>
+      <span class="history-meta">${escapeHtml(item.platform)}${dbLabel} · ${formatHistoryTime(item.ts)}${item.success ? '' : ' · falló'}</span>
       <span class="history-sql">${escapeHtml(item.sql.length > 120 ? item.sql.slice(0, 120) + '…' : item.sql)}</span>
     `;
     itemEl.title = item.sql;
     itemEl.addEventListener('click', () => {
       platformEl.value = item.platform;
+      updateDatabaseOptions();
+      databaseEl.value = (databasesByPlatform[item.platform] || []).includes(item.database) ? item.database : 'pampero';
       renderConnectionInfo();
+      updateVerifyAvailability();
       if (editor) {
         editor.setValue(item.sql);
         editor.focus();
@@ -532,10 +580,15 @@ function updateVerifyAvailability() {
   if (!activeExercise) return;
   const platform = platformEl.value;
   const supported = (activeExercise.plataformas || []).includes(platform);
-  verifyBtnEl.disabled = !supported;
-  verifyBtnEl.title = supported
-    ? 'Compara tu resultado con el esperado'
-    : 'Este ejercicio no tiene solución cargada para la plataforma elegida';
+  const onPampero = databaseEl.value === 'pampero';
+  verifyBtnEl.disabled = !supported || !onPampero;
+  if (!supported) {
+    verifyBtnEl.title = 'Este ejercicio no tiene solución cargada para la plataforma elegida';
+  } else if (!onPampero) {
+    verifyBtnEl.title = 'Los ejercicios usan la base pampero: cambiá la base para verificar';
+  } else {
+    verifyBtnEl.title = 'Compara tu resultado con el esperado';
+  }
 }
 
 function renderVerdict(correcto, feedback, advertencias) {
@@ -603,27 +656,28 @@ async function verifyExercise() {
 
 const schemaFetchesInFlight = {};
 
-async function prefetchSchema(platform) {
-  if (schemaCache[platform]) return schemaCache[platform];
-  if (schemaFetchesInFlight[platform]) return schemaFetchesInFlight[platform];
+async function prefetchSchema(platform, database) {
+  const key = `${platform}:${database}`;
+  if (schemaCache[key]) return schemaCache[key];
+  if (schemaFetchesInFlight[key]) return schemaFetchesInFlight[key];
 
-  schemaFetchesInFlight[platform] = (async () => {
+  schemaFetchesInFlight[key] = (async () => {
     try {
-      const response = await fetch(`/api/schema?platform=${platform}`);
+      const response = await fetch(`/api/schema?platform=${platform}&database=${database}`);
       if (response.ok) {
-        schemaCache[platform] = await response.json();
-        return schemaCache[platform];
+        schemaCache[key] = await response.json();
+        return schemaCache[key];
       }
     } catch (_e) {
       // schema completions won't be available; keyword completions still work
     } finally {
       // On failure the cache stays empty, so the next call retries
-      delete schemaFetchesInFlight[platform];
+      delete schemaFetchesInFlight[key];
     }
     return null;
   })();
 
-  return schemaFetchesInFlight[platform];
+  return schemaFetchesInFlight[key];
 }
 
 async function loadSettings() {
@@ -674,6 +728,7 @@ async function executeQuery() {
 
   const queryText = editor ? editor.getValue() : '';
   const platform = platformEl.value;
+  const database = databaseEl.value;
 
   try {
     const statements = splitSqlStatements(queryText);
@@ -681,7 +736,7 @@ async function executeQuery() {
       throw new Error('Solo se permite ejecutar una consulta por vez.');
     }
 
-    const payload = { platform, query: queryText };
+    const payload = { platform, database, query: queryText };
     const response = await fetch('/api/query', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -700,13 +755,13 @@ async function executeQuery() {
     const rowsLabel = data.truncated
       ? `Filas: ${data.rowCount} (mostrando las primeras ${data.rows.length})`
       : `Filas: ${data.rowCount}`;
-    metaEl.textContent = `Plataforma: ${data.platform} | ${rowsLabel} | ${timingParts.join(' | ')}`;
+    metaEl.textContent = `Plataforma: ${data.platform} | Base: ${data.database} | ${rowsLabel} | ${timingParts.join(' | ')}`;
     renderRows(data.columns || [], data.rows || []);
-    saveToHistory(queryText, platform, true);
+    saveToHistory(queryText, platform, true, database);
   } catch (error) {
     errorEl.classList.remove('hidden');
     errorEl.textContent = error.message;
-    saveToHistory(queryText, platform, false);
+    saveToHistory(queryText, platform, false, database);
   } finally {
     executeBtnEl.disabled = false;
     executeBtnEl.textContent = 'Ejecutar consulta';
@@ -789,12 +844,12 @@ function registerCompletionProvider() {
       const suggestions = [];
       const KW = monaco.languages.CompletionItemKind;
       const SNIPPET_RULE = monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet;
-      const schemaData = schemaCache[platform];
+      const schemaData = schemaCache[currentConnectionKey()];
 
       // If the initial prefetch failed (e.g. cold start right after a deploy),
       // retry in the background so upcoming completions get the schema.
       if (!schemaData) {
-        prefetchSchema(platform);
+        prefetchSchema(platform, databaseEl.value);
       }
 
       // Column completions after "alias." or "table."
@@ -913,6 +968,11 @@ function initMonaco() {
 }
 
 platformEl.addEventListener('change', () => {
+  updateDatabaseOptions();
+  renderConnectionInfo();
+  updateVerifyAvailability();
+});
+databaseEl.addEventListener('change', () => {
   renderConnectionInfo();
   updateVerifyAvailability();
 });
@@ -923,6 +983,7 @@ tabSchemaEl.addEventListener('click', () => switchSideTab('schema'));
 tabExercisesEl.addEventListener('click', () => switchSideTab('exercises'));
 tabHistoryEl.addEventListener('click', () => switchSideTab('history'));
 
+updateDatabaseOptions();
 renderConnectionInfo();
 loadSettings();
 renderHistory();

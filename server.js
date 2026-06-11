@@ -19,7 +19,7 @@ const queryStatsLogPath = process.env.QUERY_STATS_LOG_PATH
   ? path.resolve(process.env.QUERY_STATS_LOG_PATH)
   : path.join(__dirname, 'logs', 'query-stats.jsonl');
 
-let sqlServerPoolPromise = null;
+const sqlServerPoolPromises = new Map();
 let mysqlPool = null;
 let postgresPool = null;
 let sqlServerWarmupPromise = null;
@@ -51,6 +51,21 @@ function normalizePlatform(platform) {
   if (value === 'mysql') return 'mysql';
   if (value === 'postgresql' || value === 'postgres' || value === 'pg') return 'postgresql';
   return null;
+}
+
+// Bases disponibles y en qué plataformas existe cada una
+const databasePlatforms = {
+  pampero: ['sqlserver', 'mysql', 'postgresql'],
+  library: ['sqlserver']
+};
+
+function normalizeDatabaseKey(database) {
+  const value = String(database || 'pampero').trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(databasePlatforms, value) ? value : null;
+}
+
+function isDatabaseAvailable(databaseKey, platform) {
+  return (databasePlatforms[databaseKey] || []).includes(platform);
 }
 
 function toInt(value, fallback) {
@@ -265,8 +280,18 @@ function requireEnv(name) {
   return value;
 }
 
-function getConnectionFromEnv(platform) {
+function getConnectionFromEnv(platform, databaseKey = 'pampero') {
   if (platform === 'sqlserver') {
+    if (databaseKey === 'library') {
+      return {
+        host: requireEnv('SQLSERVER_HOST'),
+        port: toInt(process.env.SQLSERVER_PORT, 1433),
+        database: process.env.SQLSERVER_LIBRARY_DATABASE || 'library',
+        user: requireEnv('SQLSERVER_LIBRARY_USER'),
+        password: requireEnv('SQLSERVER_LIBRARY_PASSWORD')
+      };
+    }
+
     return {
       host: requireEnv('SQLSERVER_HOST'),
       port: toInt(process.env.SQLSERVER_PORT, 1433),
@@ -404,7 +429,9 @@ async function runPostgreSqlQuery(connection, queryText) {
 }
 
 async function getSqlServerPool(connection) {
-  if (!sqlServerPoolPromise) {
+  const poolKey = `${connection.database}:${connection.user}`;
+
+  if (!sqlServerPoolPromises.has(poolKey)) {
     const poolMin = toInt(process.env.SQLSERVER_POOL_MIN, 1);
     const poolMax = toInt(process.env.SQLSERVER_POOL_MAX, 3);
 
@@ -428,13 +455,14 @@ async function getSqlServerPool(connection) {
     };
 
     const pool = new sqlServer.ConnectionPool(config);
-    sqlServerPoolPromise = pool.connect().catch((error) => {
-      sqlServerPoolPromise = null;
+    const poolPromise = pool.connect().catch((error) => {
+      sqlServerPoolPromises.delete(poolKey);
       throw error;
     });
+    sqlServerPoolPromises.set(poolKey, poolPromise);
   }
 
-  return sqlServerPoolPromise;
+  return sqlServerPoolPromises.get(poolKey);
 }
 
 async function warmSqlServerPoolIfEnabled() {
@@ -510,14 +538,14 @@ function getPostgreSqlPool(connection) {
 async function closePools() {
   const closeTasks = [];
 
-  if (sqlServerPoolPromise) {
+  for (const poolPromise of sqlServerPoolPromises.values()) {
     closeTasks.push(
-      sqlServerPoolPromise
+      poolPromise
         .then((pool) => pool.close())
         .catch(() => null)
     );
-    sqlServerPoolPromise = null;
   }
+  sqlServerPoolPromises.clear();
 
   if (mysqlPool) {
     closeTasks.push(mysqlPool.end().catch(() => null));
@@ -535,15 +563,25 @@ async function closePools() {
 app.post('/api/query', async (req, res) => {
   const startedAt = Date.now();
   let normalizedPlatform = null;
+  let databaseKey = null;
   let queryText = '';
 
   try {
-    const { platform, query } = req.body || {};
+    const { platform, query, database } = req.body || {};
     normalizedPlatform = normalizePlatform(platform);
+    databaseKey = normalizeDatabaseKey(database);
     queryText = String(query || '');
 
     if (!normalizedPlatform) {
       return res.status(400).json({ error: 'Invalid platform. Use SQL Server, MySQL, or PostgreSQL.' });
+    }
+
+    if (!databaseKey) {
+      return res.status(400).json({ error: 'Base de datos desconocida.' });
+    }
+
+    if (!isDatabaseAvailable(databaseKey, normalizedPlatform)) {
+      return res.status(400).json({ error: `La base "${databaseKey}" no está disponible en esa plataforma.` });
     }
 
     requireField('query', query);
@@ -557,7 +595,7 @@ app.post('/api/query', async (req, res) => {
       return res.status(400).json({ error: 'Modo solo lectura activo: solo se permiten consultas de lectura.' });
     }
 
-    const connection = getConnectionFromEnv(normalizedPlatform);
+    const connection = getConnectionFromEnv(normalizedPlatform, databaseKey);
 
     let result;
 
@@ -581,6 +619,7 @@ app.post('/api/query', async (req, res) => {
       timestamp: new Date().toISOString(),
       ip: getClientIp(req),
       platform: normalizedPlatform,
+      database: databaseKey,
       query: queryText,
       success: true,
       statusCode: 200,
@@ -589,6 +628,7 @@ app.post('/api/query', async (req, res) => {
 
     return res.json({
       platform: normalizedPlatform,
+      database: databaseKey,
       durationMs,
       connectMs: result.connectMs,
       queryMs: result.queryMs,
@@ -636,8 +676,8 @@ try {
 
 const solutionResultCache = new Map();
 
-async function runQueryForPlatform(platform, queryText) {
-  const connection = getConnectionFromEnv(platform);
+async function runQueryForPlatform(platform, queryText, databaseKey = 'pampero') {
+  const connection = getConnectionFromEnv(platform, databaseKey);
   if (platform === 'sqlserver') return runSqlServerQuery(connection, queryText);
   if (platform === 'mysql') return runMySqlQuery(connection, queryText);
   return runPostgreSqlQuery(connection, queryText);
@@ -861,6 +901,11 @@ app.get('/api/schema', async (req, res) => {
     return res.status(400).json({ error: 'Invalid platform' });
   }
 
+  const databaseKey = normalizeDatabaseKey(req.query.database);
+  if (!databaseKey || !isDatabaseAvailable(databaseKey, platform)) {
+    return res.status(400).json({ error: 'Base de datos no disponible para esa plataforma.' });
+  }
+
   const schemaQueries = {
     sqlserver: `SELECT c.TABLE_SCHEMA, c.TABLE_NAME, c.COLUMN_NAME, c.DATA_TYPE, t.TABLE_TYPE
                 FROM INFORMATION_SCHEMA.COLUMNS c
@@ -884,7 +929,7 @@ app.get('/api/schema', async (req, res) => {
   };
 
   try {
-    const connection = getConnectionFromEnv(platform);
+    const connection = getConnectionFromEnv(platform, databaseKey);
     let result;
 
     if (platform === 'sqlserver') {
@@ -921,7 +966,8 @@ app.get('/api/settings', (_req, res) => {
     readOnlyMode,
     sqlServerDiagnosticsEnabled,
     queryTimeoutMs,
-    maxResultRows
+    maxResultRows,
+    databases: databasePlatforms
   });
 });
 
