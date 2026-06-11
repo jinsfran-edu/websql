@@ -25,9 +25,11 @@
         <aside class="panel side-panel">
           <div class="side-tabs">
             <button id="tabSchema" class="side-tab active" type="button">Esquema</button>
+            <button id="tabExercises" class="side-tab" type="button">Ejercicios</button>
             <button id="tabHistory" class="side-tab" type="button">Historial</button>
           </div>
           <div id="schemaTree" class="side-content"></div>
+          <div id="exerciseList" class="side-content hidden"></div>
           <div id="historyList" class="side-content hidden"></div>
         </aside>
 
@@ -45,6 +47,14 @@
             <p id="connectionInfo" class="badge"></p>
           </div>
 
+          <div id="exerciseBox" class="exercise-box hidden">
+            <div class="exercise-box-head">
+              <strong id="exerciseTitle"></strong>
+              <button id="exerciseClose" type="button" title="Cerrar ejercicio">✕</button>
+            </div>
+            <p id="exerciseStatement"></p>
+          </div>
+
           <label>Consulta SQL</label>
           <div class="editor-wrap">
             <div id="query-editor"></div>
@@ -52,6 +62,7 @@
 
           <div class="actions-row">
             <button id="executeBtn">Ejecutar consulta</button>
+            <button id="verifyBtn" class="hidden" type="button">Verificar</button>
             <p class="hint">Atajo: Ctrl/Cmd + Enter</p>
           </div>
         </section>
@@ -61,6 +72,7 @@
             <h2>Resultado</h2>
             <p id="meta" class="meta"></p>
           </div>
+          <div id="verdict" class="hidden"></div>
           <pre id="error" class="error hidden"></pre>
           <div id="tableWrap" class="table-wrap"></div>
         </section>

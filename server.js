@@ -623,6 +623,238 @@ app.post('/api/query', async (req, res) => {
   }
 });
 
+const exercisesById = new Map();
+try {
+  const exercisesData = require('./exercises.json');
+  for (const exercise of exercisesData.exercises || []) {
+    exercisesById.set(String(exercise.id), exercise);
+  }
+  console.log(`Loaded ${exercisesById.size} exercises.`);
+} catch (error) {
+  console.warn(`No exercises loaded: ${error.message}`);
+}
+
+const solutionResultCache = new Map();
+
+async function runQueryForPlatform(platform, queryText) {
+  const connection = getConnectionFromEnv(platform);
+  if (platform === 'sqlserver') return runSqlServerQuery(connection, queryText);
+  if (platform === 'mysql') return runMySqlQuery(connection, queryText);
+  return runPostgreSqlQuery(connection, queryText);
+}
+
+async function getSolutionResult(exercise, platform) {
+  const key = `${exercise.id}:${platform}`;
+  if (!solutionResultCache.has(key)) {
+    const result = await runQueryForPlatform(platform, exercise.solucion[platform]);
+    solutionResultCache.set(key, { columns: result.columns, rows: result.rows });
+  }
+  return solutionResultCache.get(key);
+}
+
+function normalizeNumericString(str) {
+  const num = Number(str);
+  if (!Number.isFinite(num)) return str;
+  // Redondeo a 4 decimales: tolera diferencias de escala entre expresiones equivalentes
+  return String(Math.round(num * 10000) / 10000);
+}
+
+function normalizeCellValue(value) {
+  if (value == null) return '\u0000NULL';
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'number' || typeof value === 'bigint') return normalizeNumericString(String(value));
+  if (Buffer.isBuffer(value)) return value.toString('hex');
+  const str = String(value);
+  if (/^-?\d+(\.\d+)?$/.test(str)) return normalizeNumericString(str);
+  // CHAR de ancho fijo llega con espacios de relleno
+  return str.replace(/\s+$/, '');
+}
+
+function buildRowKey(row) {
+  return Object.values(row).map(normalizeCellValue).join('\u0001');
+}
+
+function usesSelectStar(queryText) {
+  // "SELECT *", "SELECT DISTINCT *", "SELECT TOP n *", "SELECT alias.*"...
+  // No debe marcar COUNT(*) ni otros agregados: ahí el * va precedido por "(".
+  const selectStar = /\bselect\s+(distinct\s+)?(top\s*\(?\s*\d+\s*\)?\s*(with\s+ties\s+)?)?(\w+\.)?\*/i;
+  // "..., alias.*" en medio de la lista de columnas
+  const listStar = /,\s*\w+\.\*/;
+  return selectStar.test(queryText) || listStar.test(queryText);
+}
+
+function compareExerciseResults(studentResult, solutionResult) {
+  const feedback = [];
+  const studentRows = studentResult.rows || [];
+  const solutionRows = solutionResult.rows || [];
+
+  if (studentRows.length !== solutionRows.length) {
+    feedback.push(`Tu consulta devuelve ${studentRows.length} fila(s); se esperaban ${solutionRows.length}. Revisá tus condiciones de filtrado.`);
+    return { correcto: false, feedback };
+  }
+
+  const studentCols = (studentResult.columns || []).length;
+  const solutionCols = (solutionResult.columns || []).length;
+  if (studentCols !== solutionCols) {
+    feedback.push(`Tu consulta devuelve ${studentCols} columna(s); se esperaban ${solutionCols}.`);
+    return { correcto: false, feedback };
+  }
+
+  const counts = new Map();
+  for (const row of solutionRows) {
+    const key = buildRowKey(row);
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+
+  let mismatched = 0;
+  for (const row of studentRows) {
+    const key = buildRowKey(row);
+    const remaining = counts.get(key) || 0;
+    if (remaining === 0) {
+      mismatched += 1;
+    } else {
+      counts.set(key, remaining - 1);
+    }
+  }
+
+  if (mismatched > 0) {
+    feedback.push(`${mismatched} fila(s) no coinciden con el resultado esperado. Revisá las columnas seleccionadas y los valores calculados.`);
+    return { correcto: false, feedback };
+  }
+
+  return { correcto: true, feedback };
+}
+
+app.get('/api/exercises', (_req, res) => {
+  const list = Array.from(exercisesById.values()).map((exercise) => ({
+    id: exercise.id,
+    dificultad: exercise.dificultad,
+    enunciado: exercise.enunciado,
+    ordenado: Boolean(exercise.ordenado),
+    plataformas: Object.keys(exercise.solucion || {})
+  }));
+  res.json({ exercises: list });
+});
+
+app.post('/api/exercises/:id/check', async (req, res) => {
+  const startedAt = Date.now();
+  let normalizedPlatform = null;
+  let queryText = '';
+  let exerciseId = null;
+
+  try {
+    const exercise = exercisesById.get(String(req.params.id));
+    if (!exercise) {
+      return res.status(404).json({ error: 'Ejercicio no encontrado.' });
+    }
+    exerciseId = exercise.id;
+
+    const { platform, query } = req.body || {};
+    normalizedPlatform = normalizePlatform(platform);
+    queryText = String(query || '');
+
+    if (!normalizedPlatform) {
+      return res.status(400).json({ error: 'Invalid platform. Use SQL Server, MySQL, or PostgreSQL.' });
+    }
+
+    if (!exercise.solucion || !exercise.solucion[normalizedPlatform]) {
+      return res.status(400).json({ error: 'Este ejercicio no tiene solución cargada para la plataforma elegida.' });
+    }
+
+    requireField('query', query);
+
+    const statements = splitSqlStatements(queryText);
+    if (statements.length !== 1) {
+      return res.status(400).json({ error: 'Solo se permite verificar una consulta por vez.' });
+    }
+
+    if (!isReadOnlyStatement(statements[0])) {
+      return res.status(400).json({ error: 'Solo se permiten consultas de lectura en la verificación.' });
+    }
+
+    const studentResult = await runQueryForPlatform(normalizedPlatform, queryText);
+
+    let solutionResult;
+    try {
+      solutionResult = await getSolutionResult(exercise, normalizedPlatform);
+    } catch (solutionError) {
+      console.error(`Solution query failed for exercise ${exercise.id} (${normalizedPlatform}): ${solutionError.message}`);
+      return res.status(500).json({ error: 'No se pudo ejecutar la consulta de referencia del ejercicio. Avisale al docente.' });
+    }
+
+    let { correcto, feedback } = compareExerciseResults(studentResult, solutionResult);
+
+    if (correcto && exercise.ordenado && !/\border\s+by\b/i.test(queryText)) {
+      correcto = false;
+      feedback = ['Los datos coinciden, pero el enunciado pide un orden específico y tu consulta no incluye ORDER BY.'];
+    }
+
+    const advertencias = [];
+    if (usesSelectStar(queryText)) {
+      advertencias.push('Usaste SELECT *: aunque el resultado sea correcto, no es una buena práctica. Listá explícitamente las columnas que necesitás.');
+    }
+
+    let truncated = false;
+    let responseRows = studentResult.rows || [];
+    if (responseRows.length > maxResultRows) {
+      responseRows = responseRows.slice(0, maxResultRows);
+      truncated = true;
+    }
+
+    const durationMs = Date.now() - startedAt;
+    await appendQueryStat({
+      timestamp: new Date().toISOString(),
+      ip: getClientIp(req),
+      platform: normalizedPlatform,
+      query: queryText,
+      success: true,
+      statusCode: 200,
+      durationMs,
+      exerciseId: exercise.id,
+      correcto
+    });
+
+    return res.json({
+      platform: normalizedPlatform,
+      exerciseId: exercise.id,
+      correcto,
+      feedback,
+      advertencias,
+      durationMs,
+      columns: studentResult.columns || [],
+      rows: responseRows,
+      rowCount: (studentResult.rows || []).length,
+      truncated,
+      maxResultRows
+    });
+  } catch (error) {
+    const statusCode = isQueryTimeoutError(error) ? 504 : 500;
+    await appendQueryStat({
+      timestamp: new Date().toISOString(),
+      ip: getClientIp(req),
+      platform: normalizedPlatform || 'unknown',
+      query: queryText,
+      success: false,
+      statusCode,
+      durationMs: Date.now() - startedAt,
+      exerciseId,
+      error: error.message || 'Unexpected error checking exercise'
+    }).catch((logError) => {
+      console.error(`Failed to write query stats log: ${logError.message}`);
+    });
+
+    if (isQueryTimeoutError(error)) {
+      return res.status(504).json({
+        error: `La consulta supero el timeout configurado (${queryTimeoutMs} ms).`
+      });
+    }
+
+    return res.status(500).json({
+      error: error.message || 'Unexpected error checking exercise'
+    });
+  }
+});
+
 app.get('/api/schema', async (req, res) => {
   const platform = normalizePlatform(req.query.platform);
   if (!platform) {
