@@ -4,6 +4,7 @@
       "id": 1,
       "dificultad": "básica",
       "ordenado": true,
+      "ordenPor": [2],
       "enunciado": "Seleccione todos los campos de la tabla Clientes, ordenados por nombre del contacto de la empresa, alfabéticamente.",
       "solucion": {
         "sqlserver": "SELECT IDCliente, NombreEmpresa, NombreContacto, PuestoContacto, Direccion, Ciudad, Region, CodigoPostal, Pais, Telefono, Fax FROM Clientes ORDER BY NombreContacto;",
@@ -14,6 +15,7 @@
       "id": 2,
       "dificultad": "básica",
       "ordenado": true,
+      "ordenPor": [3],
       "enunciado": "Seleccione todos los campos de la tabla Pedidos, ordenados por fecha de la orden, descendentemente.",
       "solucion": {
         "sqlserver": "SELECT IDPedido, IDCliente, IDEmpleado, FechaPedido, FechaRequerida, FechaEnvio, EnvioPor, Flete, NombreEnvio, DireccionEnvio, CiudadEnvio, RegionEnvio, CodigoPostalEnvio, PaisEnvio FROM Pedidos ORDER BY FechaPedido DESC;",
@@ -24,6 +26,7 @@
       "id": 3,
       "dificultad": "básica",
       "ordenado": true,
+      "ordenPor": [3],
       "enunciado": "Seleccione todos los campos de la tabla Detalles Pedido, ordenados por cantidad pedida, ascendentemente.",
       "solucion": {
         "sqlserver": "SELECT IDPedido, IDProducto, PrecioUnitario, Cantidad, Descuento FROM [Detalles Pedido] ORDER BY Cantidad;",
@@ -104,6 +107,7 @@
       "id": 11,
       "dificultad": "básica",
       "ordenado": true,
+      "ordenPor": [4],
       "enunciado": "Seleccionar todos los campos del cliente cuya empresa empiece con las letras O hasta la S y pertenezca al país EE.UU., ordenados por la dirección.",
       "solucion": {
         "sqlserver": "SELECT IDCliente, NombreEmpresa, NombreContacto, PuestoContacto, Direccion, Ciudad, Region, CodigoPostal, Pais, Telefono, Fax FROM Clientes WHERE NombreEmpresa >= 'O' AND NombreEmpresa < 'T' AND Pais = 'EE.UU.' ORDER BY Direccion;",
@@ -114,6 +118,7 @@
       "id": 12,
       "dificultad": "básica",
       "ordenado": true,
+      "ordenPor": [1],
       "enunciado": "Seleccionar todos los campos del cliente cuya empresa empiece con las letras B a la G y pertenezca al Reino Unido, ordenados por nombre de la empresa.",
       "solucion": {
         "sqlserver": "SELECT IDCliente, NombreEmpresa, NombreContacto, PuestoContacto, Direccion, Ciudad, Region, CodigoPostal, Pais, Telefono, Fax FROM Clientes WHERE NombreEmpresa >= 'B' AND NombreEmpresa < 'H' AND Pais = 'Reino Unido' ORDER BY NombreEmpresa;",
@@ -134,6 +139,7 @@
       "id": 14,
       "dificultad": "básica",
       "ordenado": true,
+      "ordenPor": [2, 5],
       "enunciado": "Seleccionar todos los campos de los productos descontinuados que pertenezcan a los proveedores con códigos 1, 3, 7, 8 y 9, que tengan stock en almacén y cuyos precios unitarios estén entre 39 y 190, ordenados por código de proveedor y precio unitario de manera ascendente.",
       "solucion": {
         "sqlserver": "SELECT IDProducto, NombreProducto, IDProveedor, IDCategoria, CantidadPorUnidad, PrecioUnitario, UnidadesEnStock, UnidadesEnPedidos, NivelNuevoPedido, Discontinuado FROM Productos WHERE Discontinuado = 1 AND IDProveedor IN (1, 3, 7, 8, 9) AND UnidadesEnStock > 0 AND PrecioUnitario BETWEEN 39 AND 190 ORDER BY IDProveedor, PrecioUnitario;",
@@ -384,6 +390,7 @@
       "id": 39,
       "dificultad": "avanzada",
       "ordenado": true,
+      "ordenPor": [0],
       "enunciado": "Obtener el número de productos por cada categoría. Mostrar el nombre de la categoría, el nombre del producto y el total de productos por categoría, solamente de las categorías 3, 5 y 8. Ordenar por el nombre de la categoría.",
       "solucion": {
         "sqlserver": "SELECT C.NombreCategoria, P.NombreProducto, (SELECT COUNT(*) FROM Productos AS PS WHERE PS.IDCategoria = P.IDCategoria) AS CantCategoria FROM Productos AS P JOIN Categorias AS C ON P.IDCategoria = C.IDCategoria WHERE P.IDCategoria IN (3, 5, 8) ORDER BY NombreCategoria;",
@@ -444,6 +451,7 @@
       "id": 45,
       "dificultad": "avanzada",
       "ordenado": true,
+      "ordenPor": [3],
       "enunciado": "¿Qué clientes compraron productos suministrados por proveedores que residen en la misma región que ellos? Mostrar ID, nombre de la empresa, nombre del contacto y región. Incluir aquellos cuya región es NULL si la región del proveedor también es NULL. Ordenar por región.",
       "solucion": {
         "sqlserver": "SELECT DISTINCT C.IDCliente, C.NombreEmpresa, C.NombreContacto, C.Region FROM Clientes C JOIN Pedidos P ON C.IDCliente = P.IDCliente JOIN [Detalles Pedido] DP ON P.IDPedido = DP.IDPedido JOIN Productos PR ON DP.IDProducto = PR.IDProducto JOIN Proveedores PV ON PR.IDProveedor = PV.IDProveedor WHERE (C.Region = PV.Region OR (C.Region IS NULL AND PV.Region IS NULL)) ORDER BY C.Region;",
@@ -454,6 +462,7 @@
       "id": 46,
       "dificultad": "avanzada",
       "ordenado": true,
+      "ordenPor": [3, 1],
       "enunciado": "Listar los productos (ID, nombre, precio unitario y nombre de su categoría) cuyo precio unitario está por encima del precio promedio de su categoría. Ordenar por nombre de categoría y nombre de producto.",
       "solucion": {
         "sqlserver": "SELECT P.IDProducto, P.NombreProducto, P.PrecioUnitario, C.NombreCategoria FROM Productos P JOIN Categorias C ON P.IDCategoria = C.IDCategoria WHERE P.PrecioUnitario > (SELECT AVG(P2.PrecioUnitario) FROM Productos P2 WHERE P2.IDCategoria = P.IDCategoria) ORDER BY C.NombreCategoria, P.NombreProducto;",
@@ -464,6 +473,7 @@
       "id": 47,
       "dificultad": "avanzada",
       "ordenado": true,
+      "ordenPor": [1],
       "enunciado": "Listar los proveedores junto con el producto más caro que suministran. Mostrar ID del proveedor, nombre de la empresa, ID del producto y nombre del producto. Ordenar por nombre de la empresa proveedora.",
       "solucion": {
         "sqlserver": "SELECT PV.IDProveedor, PV.NombreEmpresa, P.IDProducto, P.NombreProducto FROM Proveedores PV JOIN Productos P ON PV.IDProveedor = P.IDProveedor WHERE P.PrecioUnitario = (SELECT MAX(P2.PrecioUnitario) FROM Productos P2 WHERE P2.IDProveedor = PV.IDProveedor) ORDER BY PV.NombreEmpresa;",
@@ -494,6 +504,7 @@
       "id": 50,
       "dificultad": "avanzada",
       "ordenado": true,
+      "ordenPor": [0],
       "enunciado": "Listar los clientes de España que realizaron pedidos durante 2020. Mostrar TODOS los clientes de España: para los que pidieron en 2020, mostrar el nombre del último mes con pedido; para los demás, mostrar 'Sin Pedidos'. Ordenar por nombre de la empresa.",
       "solucion": {
         "sqlserver": "SELECT C.NombreEmpresa, CASE MAX(MONTH(P.FechaPedido)) WHEN 1 THEN 'Enero' WHEN 2 THEN 'Febrero' WHEN 3 THEN 'Marzo' WHEN 4 THEN 'Abril' WHEN 5 THEN 'Mayo' WHEN 6 THEN 'Junio' WHEN 7 THEN 'Julio' WHEN 8 THEN 'Agosto' WHEN 9 THEN 'Septiembre' WHEN 10 THEN 'Octubre' WHEN 11 THEN 'Noviembre' WHEN 12 THEN 'Diciembre' ELSE 'Sin Pedidos' END AS MesUltimaOrden FROM Clientes AS C LEFT JOIN Pedidos AS P ON C.IDCliente = P.IDCliente AND P.FechaPedido >= '20200101' AND P.FechaPedido < '20210101' WHERE C.Pais = 'España' GROUP BY C.NombreEmpresa ORDER BY C.NombreEmpresa;",

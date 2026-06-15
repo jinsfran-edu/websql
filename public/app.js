@@ -592,8 +592,7 @@ function updateVerifyAvailability() {
 }
 
 function renderVerdict(correcto, feedback, advertencias) {
-  verdictEl.classList.remove('hidden', 'verdict-ok', 'verdict-fail');
-  verdictEl.classList.add(correcto ? 'verdict-ok' : 'verdict-fail');
+  verdictEl.className = correcto ? 'verdict-ok' : 'verdict-fail';
 
   const warnings = (advertencias || [])
     .map((msg) => `<p class="verdict-warning">⚠ ${escapeHtml(msg)}</p>`)
@@ -715,10 +714,19 @@ function renderRows(columns, rows) {
 function clearState() {
   errorEl.classList.add('hidden');
   errorEl.textContent = '';
-  verdictEl.classList.add('hidden');
+  verdictEl.className = 'hidden';
   verdictEl.innerHTML = '';
   tableWrapEl.innerHTML = '';
   metaEl.textContent = '';
+}
+
+// Advertencias de buenas prácticas sin veredicto (para "Ejecutar consulta")
+function renderWarningsOnly(advertencias) {
+  if (!advertencias || !advertencias.length) return;
+  verdictEl.className = 'verdict-warn';
+  verdictEl.innerHTML = advertencias
+    .map((msg) => `<p class="verdict-warning">⚠ ${escapeHtml(msg)}</p>`)
+    .join('');
 }
 
 async function executeQuery() {
@@ -756,6 +764,7 @@ async function executeQuery() {
       ? `Filas: ${data.rowCount} (mostrando las primeras ${data.rows.length})`
       : `Filas: ${data.rowCount}`;
     metaEl.textContent = `Plataforma: ${data.platform} | Base: ${data.database} | ${rowsLabel} | ${timingParts.join(' | ')}`;
+    renderWarningsOnly(data.advertencias);
     renderRows(data.columns || [], data.rows || []);
     saveToHistory(queryText, platform, true, database);
   } catch (error) {

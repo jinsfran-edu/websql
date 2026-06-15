@@ -446,6 +446,21 @@ select[disabled] {
   font-size: 0.86rem;
 }
 
+.verdict-warn {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+}
+
+.verdict-warn .verdict-warning {
+  border-top: none;
+  padding-top: 0;
+  margin: 2px 0;
+}
+
 #executeBtn {
   border: none;
   border-radius: 12px;
