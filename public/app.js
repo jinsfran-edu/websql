@@ -17,6 +17,25 @@ const exerciseStatementEl = document.getElementById('exerciseStatement');
 const exerciseCloseEl = document.getElementById('exerciseClose');
 const verifyBtnEl = document.getElementById('verifyBtn');
 const verdictEl = document.getElementById('verdict');
+const themeToggleEl = document.getElementById('themeToggle');
+const fontIncEl = document.getElementById('fontInc');
+const fontDecEl = document.getElementById('fontDec');
+const fontSizeLabelEl = document.getElementById('fontSizeLabel');
+const editorWrapEl = document.getElementById('editorWrap');
+const layoutEl = document.getElementById('layout');
+const colSplitterEl = document.getElementById('colSplitter');
+const layoutToggleEl = document.getElementById('layoutToggle');
+
+const THEME_KEY = 'websql_theme';
+const FONT_SIZE_KEY = 'websql_editor_font';
+const EDITOR_HEIGHT_KEY = 'websql_editor_height';
+const LAYOUT_KEY = 'websql_layout';
+const EDITOR_WIDTH_KEY = 'websql_editor_width';
+const FONT_MIN = 11;
+const FONT_MAX = 26;
+const EDITOR_WIDTH_MIN = 340;
+const EDITOR_WIDTH_MAX = 820;
+let editorFontSize = 14;
 
 let appSettings = { readOnlyMode: null };
 let editor = null;
@@ -939,7 +958,172 @@ function registerCompletionProvider() {
   });
 }
 
+// ---------- Tema claro / oscuro ----------
+
+function isDarkTheme() {
+  return document.documentElement.getAttribute('data-theme') === 'dark';
+}
+
+function applyTheme(dark) {
+  if (dark) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+  themeToggleEl.textContent = dark ? '☀️' : '🌙';
+  themeToggleEl.title = dark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro';
+  if (editor && window.monaco) {
+    monaco.editor.setTheme(dark ? 'vs-dark' : 'vs');
+  }
+}
+
+function toggleTheme() {
+  const dark = !isDarkTheme();
+  try {
+    localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light');
+  } catch (_e) {
+    // preferencia opcional
+  }
+  applyTheme(dark);
+}
+
+// ---------- Tamaño de fuente del editor ----------
+
+function applyFontSize(size) {
+  editorFontSize = Math.min(FONT_MAX, Math.max(FONT_MIN, size));
+  fontSizeLabelEl.textContent = `${editorFontSize}px`;
+  if (editor) editor.updateOptions({ fontSize: editorFontSize });
+  try {
+    localStorage.setItem(FONT_SIZE_KEY, String(editorFontSize));
+  } catch (_e) {
+    // preferencia opcional
+  }
+}
+
+function loadFontSize() {
+  const stored = parseInt(localStorage.getItem(FONT_SIZE_KEY), 10);
+  if (Number.isFinite(stored)) {
+    editorFontSize = Math.min(FONT_MAX, Math.max(FONT_MIN, stored));
+  }
+  fontSizeLabelEl.textContent = `${editorFontSize}px`;
+}
+
+// ---------- Alto del editor (redimensionable) ----------
+
+function applySavedEditorHeight() {
+  const stored = parseInt(localStorage.getItem(EDITOR_HEIGHT_KEY), 10);
+  if (Number.isFinite(stored) && stored >= 180) {
+    editorWrapEl.style.height = `${stored}px`;
+  }
+}
+
+function watchEditorHeight() {
+  if (typeof ResizeObserver === 'undefined') return;
+  const observer = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      const height = Math.round(entry.contentRect.height);
+      if (height >= 180) {
+        try {
+          localStorage.setItem(EDITOR_HEIGHT_KEY, String(height));
+        } catch (_e) {
+          // preferencia opcional
+        }
+      }
+    }
+  });
+  observer.observe(editorWrapEl);
+}
+
+// ---------- Posición de los resultados (derecha / abajo) ----------
+
+function applyLayout(mode) {
+  const below = mode === 'below';
+  layoutEl.classList.toggle('stack-below', below);
+  layoutToggleEl.textContent = below ? 'Resultados a la derecha ▸' : 'Resultados abajo ▾';
+  layoutToggleEl.title = below
+    ? 'Mostrar los resultados a la derecha del editor'
+    : 'Mostrar los resultados debajo del editor';
+}
+
+function toggleLayout() {
+  const below = !layoutEl.classList.contains('stack-below');
+  try {
+    localStorage.setItem(LAYOUT_KEY, below ? 'below' : 'right');
+  } catch (_e) {
+    // preferencia opcional
+  }
+  applyLayout(below ? 'below' : 'right');
+}
+
+// ---------- Ancho del editor (divisor arrastrable) ----------
+
+function setEditorWidth(px) {
+  const width = Math.min(EDITOR_WIDTH_MAX, Math.max(EDITOR_WIDTH_MIN, px));
+  layoutEl.style.setProperty('--editor-w', `${width}px`);
+  return width;
+}
+
+function applySavedEditorWidth() {
+  const stored = parseInt(localStorage.getItem(EDITOR_WIDTH_KEY), 10);
+  if (Number.isFinite(stored)) {
+    setEditorWidth(stored);
+  }
+}
+
+function initColumnSplitter() {
+  let dragging = false;
+  let startX = 0;
+  let startWidth = 0;
+
+  colSplitterEl.addEventListener('pointerdown', (event) => {
+    dragging = true;
+    startX = event.clientX;
+    startWidth = document.querySelector('.editor-panel').getBoundingClientRect().width;
+    colSplitterEl.classList.add('dragging');
+    colSplitterEl.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+
+  colSplitterEl.addEventListener('pointermove', (event) => {
+    if (!dragging) return;
+    setEditorWidth(startWidth + (event.clientX - startX));
+  });
+
+  function endDrag(event) {
+    if (!dragging) return;
+    dragging = false;
+    colSplitterEl.classList.remove('dragging');
+    try {
+      colSplitterEl.releasePointerCapture(event.pointerId);
+    } catch (_e) {
+      // el puntero ya pudo soltarse
+    }
+    const width = Math.round(document.querySelector('.editor-panel').getBoundingClientRect().width);
+    try {
+      localStorage.setItem(EDITOR_WIDTH_KEY, String(width));
+    } catch (_e) {
+      // preferencia opcional
+    }
+  }
+
+  colSplitterEl.addEventListener('pointerup', endDrag);
+  colSplitterEl.addEventListener('pointercancel', endDrag);
+
+  // Doble clic: volver al ancho por defecto
+  colSplitterEl.addEventListener('dblclick', () => {
+    layoutEl.style.removeProperty('--editor-w');
+    try {
+      localStorage.removeItem(EDITOR_WIDTH_KEY);
+    } catch (_e) {
+      // preferencia opcional
+    }
+  });
+}
+
 function initMonaco() {
+  loadFontSize();
+  applySavedEditorHeight();
+
   require.config({
     paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs' }
   });
@@ -948,9 +1132,9 @@ function initMonaco() {
     editor = monaco.editor.create(document.getElementById('query-editor'), {
       value: 'SELECT 1 AS ok;',
       language: 'sql',
-      theme: 'vs',
+      theme: isDarkTheme() ? 'vs-dark' : 'vs',
       minimap: { enabled: false },
-      fontSize: 14,
+      fontSize: editorFontSize,
       fontFamily: "'Cascadia Code', Consolas, 'Courier New', monospace",
       lineNumbers: 'on',
       automaticLayout: true,
@@ -973,6 +1157,7 @@ function initMonaco() {
     );
 
     registerCompletionProvider();
+    watchEditorHeight();
   });
 }
 
@@ -991,7 +1176,15 @@ exerciseCloseEl.addEventListener('click', closeExercise);
 tabSchemaEl.addEventListener('click', () => switchSideTab('schema'));
 tabExercisesEl.addEventListener('click', () => switchSideTab('exercises'));
 tabHistoryEl.addEventListener('click', () => switchSideTab('history'));
+themeToggleEl.addEventListener('click', toggleTheme);
+fontIncEl.addEventListener('click', () => applyFontSize(editorFontSize + 1));
+fontDecEl.addEventListener('click', () => applyFontSize(editorFontSize - 1));
+layoutToggleEl.addEventListener('click', toggleLayout);
 
+applyTheme(isDarkTheme());
+applyLayout(localStorage.getItem(LAYOUT_KEY) === 'below' ? 'below' : 'right');
+applySavedEditorWidth();
+initColumnSplitter();
 updateDatabaseOptions();
 renderConnectionInfo();
 loadSettings();

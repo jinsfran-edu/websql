@@ -4,6 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pampero SQL</title>
+    <script>
+      // Aplica el tema guardado antes del primer render para evitar parpadeo
+      (function () {
+        try {
+          if (localStorage.getItem('websql_theme') === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -16,12 +26,13 @@
   <body>
     <main class="container">
       <header class="hero">
+        <button id="themeToggle" class="theme-toggle" type="button" title="Cambiar tema claro/oscuro" aria-label="Cambiar tema">🌙</button>
         <p class="eyebrow">Laboratorio de consultas</p>
         <h1>Pampero SQL</h1>
         <p class="hero-copy">Ejecuta, compara y valida consultas en SQL Server, MySQL y PostgreSQL desde una sola vista.</p>
       </header>
 
-      <div class="layout">
+      <div class="layout" id="layout">
         <aside class="panel side-panel">
           <div class="side-tabs">
             <button id="tabSchema" class="side-tab active" type="button">Esquema</button>
@@ -63,21 +74,33 @@
             <p id="exerciseStatement"></p>
           </div>
 
-          <label>Consulta SQL</label>
-          <div class="editor-wrap">
+          <div class="editor-head">
+            <label>Consulta SQL</label>
+            <div class="editor-tools">
+              <button id="fontDec" class="tool-btn" type="button" title="Reducir tamaño de fuente">A−</button>
+              <span id="fontSizeLabel" class="tool-label">14px</span>
+              <button id="fontInc" class="tool-btn" type="button" title="Aumentar tamaño de fuente">A+</button>
+            </div>
+          </div>
+          <div id="editorWrap" class="editor-wrap">
             <div id="query-editor"></div>
           </div>
+          <p class="resize-hint">Arrastrá el borde inferior para agrandar el editor.</p>
 
           <div class="actions-row">
             <button id="executeBtn">Ejecutar consulta</button>
             <button id="verifyBtn" class="hidden" type="button">Verificar</button>
             <p class="hint">Atajo: Ctrl/Cmd + Enter</p>
           </div>
+          <div id="colSplitter" class="col-splitter" title="Arrastrá para ajustar el ancho del editor"></div>
         </section>
 
         <section class="panel result-panel">
           <div class="result-head">
-            <h2>Resultado</h2>
+            <div class="result-title">
+              <h2>Resultado</h2>
+              <button id="layoutToggle" class="tool-btn" type="button"></button>
+            </div>
             <p id="meta" class="meta"></p>
           </div>
           <div id="verdict" class="hidden"></div>
