@@ -9,16 +9,17 @@ const {
   isDatabaseAvailable,
   splitSqlStatements,
   getLeadingSqlKeyword,
-  isReadOnlyStatement,
+  isReadOnlyStatement
+} = require('../lib/sql-utils');
+const {
   normalizeNumericString,
   normalizeCellValue,
   buildRowKey,
   diffRowMultisets,
-  compareExerciseResults,
-  usesSelectStar,
-  detectAntipatterns,
-  buildStats
-} = require('../server.js');
+  compareExerciseResults
+} = require('../lib/exercise-checker');
+const { usesSelectStar, detectAntipatterns } = require('../lib/antipatterns');
+const { buildStats } = require('../lib/stats');
 
 // Helpers para construir resultados con el shape { columns, rows }
 function rows(...records) {
