@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pampero SQL · Panel docente</title>
+    <script>
+      (function () {
+        try {
+          if (localStorage.getItem('websql_theme') === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Sora:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .stat-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 14px;
+        margin-bottom: 18px;
+      }
+      .stat-card {
+        background: linear-gradient(180deg, var(--panel-top) 0%, var(--panel) 100%);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 16px;
+      }
+      .stat-card .num {
+        font-family: Sora, sans-serif;
+        font-size: 1.9rem;
+        font-weight: 700;
+        color: var(--accent-text);
+      }
+      .stat-card .lbl {
+        font-size: 0.8rem;
+        color: var(--muted);
+        font-weight: 600;
+        margin-top: 2px;
+      }
+      .grid-2 {
+        display: grid;
+        grid-template-columns: 1.4fr 1fr;
+        gap: 16px;
+        align-items: start;
+      }
+      @media (max-width: 940px) {
+        .grid-2 { grid-template-columns: 1fr; }
+      }
+      .card {
+        background: linear-gradient(180deg, var(--panel-top) 0%, var(--panel) 100%);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+      .card h2 { font-size: 1.05rem; margin-bottom: 12px; }
+      table.stats { border-collapse: collapse; width: 100%; font-size: 0.86rem; }
+      table.stats th, table.stats td {
+        border-bottom: 1px solid var(--td-border);
+        padding: 7px 8px;
+        text-align: left;
+      }
+      table.stats th { color: var(--th-ink); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.04em; }
+      table.stats td.num, table.stats th.num { text-align: right; font-variant-numeric: tabular-nums; }
+      .bar {
+        position: relative;
+        background: var(--hover-bg);
+        border-radius: 6px;
+        height: 22px;
+        min-width: 30px;
+      }
+      .bar > span {
+        position: absolute;
+        inset: 0;
+        background: var(--primary);
+        border-radius: 6px;
+      }
+      .rate {
+        display: inline-block;
+        min-width: 42px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        font-size: 0.74rem;
+        font-weight: 700;
+        text-align: center;
+      }
+      .rate.low { background: var(--fail-bg); color: var(--fail-ink); }
+      .rate.mid { background: var(--media-bg); color: var(--media-ink); }
+      .rate.high { background: var(--ok-bg); color: var(--ok-ink); }
+      .err-msg { font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.78rem; word-break: break-word; }
+      .muted { color: var(--muted); }
+      .pill-ok { color: var(--ok-ink); font-weight: 700; }
+      .pill-fail { color: var(--fail-ink); font-weight: 700; }
+      .nav-link { color: var(--accent-text); font-weight: 700; text-decoration: none; }
+      #loadError {
+        background: var(--warn-bg);
+        color: var(--warn-ink);
+        border: 1px solid var(--warn-border);
+        padding: 12px;
+        border-radius: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="container">
+      <header class="hero">
+        <button id="themeToggle" class="theme-toggle" type="button" title="Cambiar tema" aria-label="Cambiar tema">🌙</button>
+        <p class="eyebrow">Panel docente</p>
+        <h1>Estadísticas de uso</h1>
+        <p class="hero-copy">
+          Actividad agregada del laboratorio. <a class="nav-link" href="index.html">← Volver al editor</a>
+        </p>
+      </header>
+
+      <div id="loadError" class="hidden"></div>
+
+      <section id="content" class="hidden">
+        <div class="stat-cards" id="cards"></div>
+
+        <div class="card">
+          <h2>Ejercicios más difíciles</h2>
+          <p class="muted" style="margin-top:-6px;font-size:0.82rem;">Ordenados por menor tasa de aciertos.</p>
+          <table class="stats" id="exTable">
+            <thead>
+              <tr>
+                <th>Ejercicio</th><th class="num">Intentos</th><th class="num">Correctos</th>
+                <th class="num">Alumnos</th><th>Tasa de aciertos</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h2>Actividad por día</h2>
+            <table class="stats" id="dayTable">
+              <thead>
+                <tr><th>Día</th><th class="num">Consultas</th><th class="num">Verificaciones</th><th class="num">Correctas</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="card">
+            <h2>Uso por plataforma</h2>
+            <table class="stats" id="platTable"><tbody></tbody></table>
+            <h2 style="margin-top:16px;">Uso por base</h2>
+            <table class="stats" id="dbTable"><tbody></tbody></table>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Errores más frecuentes</h2>
+          <table class="stats" id="errTable">
+            <thead><tr><th class="num">#</th><th>Mensaje</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h2>Actividad reciente</h2>
+          <table class="stats" id="recentTable">
+            <thead>
+              <tr><th>Fecha/hora</th><th>IP</th><th>Plataforma</th><th>Base</th><th>Ejercicio</th><th>Resultado</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="admin.js"></script>
+  </body>
+</html>
