@@ -16,7 +16,8 @@ const {
   diffRowMultisets,
   compareExerciseResults,
   usesSelectStar,
-  detectAntipatterns
+  detectAntipatterns,
+  buildStats
 } = require('../server.js');
 
 // Helpers para construir resultados con el shape { columns, rows }
@@ -258,5 +259,57 @@ describe('detectAntipatterns', () => {
   test('varios antipatrones a la vez', () => {
     const found = detectAntipatterns('SELECT a, b FROM x, y ORDER BY 1');
     assert.equal(found.length, 2);
+  });
+});
+
+describe('buildStats (dashboard docente)', () => {
+  const lines = [
+    JSON.stringify({ timestamp: '2026-06-10T10:00:00.000Z', ip: '1.1.1.1', platform: 'sqlserver', database: 'pampero', success: true }),
+    JSON.stringify({ timestamp: '2026-06-10T11:00:00.000Z', ip: '2.2.2.2', platform: 'mysql', database: 'pampero', success: true, exerciseId: 5, correcto: true }),
+    JSON.stringify({ timestamp: '2026-06-11T09:00:00.000Z', ip: '1.1.1.1', platform: 'sqlserver', database: 'pampero', success: true, exerciseId: 5, correcto: false }),
+    JSON.stringify({ timestamp: '2026-06-11T09:05:00.000Z', ip: '1.1.1.1', platform: 'sqlserver', database: 'library', success: false, error: 'Invalid column name X' }),
+    'línea corrupta { no json'
+  ];
+
+  test('totales, usuarios únicos y errores', () => {
+    const s = buildStats(lines);
+    assert.equal(s.totals.queries, 4); // ignora la línea corrupta
+    assert.equal(s.totals.exerciseChecks, 2);
+    assert.equal(s.totals.errors, 1);
+    assert.equal(s.totals.uniqueUsers, 2);
+    assert.equal(s.totals.firstTs, '2026-06-10T10:00:00.000Z');
+    assert.equal(s.totals.lastTs, '2026-06-11T09:05:00.000Z');
+  });
+
+  test('conteo por plataforma y base', () => {
+    const s = buildStats(lines);
+    assert.equal(s.byPlatform.sqlserver, 3);
+    assert.equal(s.byPlatform.mysql, 1);
+    assert.equal(s.byDatabase.pampero, 3);
+    assert.equal(s.byDatabase.library, 1);
+  });
+
+  test('agregado por ejercicio con tasa de aciertos y alumnos', () => {
+    const s = buildStats(lines);
+    const ex5 = s.exercises.find((e) => String(e.exerciseId) === '5');
+    assert.equal(ex5.attempts, 2);
+    assert.equal(ex5.correct, 1);
+    assert.equal(ex5.students, 2);
+    assert.equal(ex5.successRate, 50);
+  });
+
+  test('actividad por día y errores más frecuentes', () => {
+    const s = buildStats(lines);
+    assert.equal(s.byDay.length, 2);
+    assert.equal(s.byDay[0].day, '2026-06-10');
+    assert.equal(s.topErrors[0].message, 'Invalid column name X');
+    assert.equal(s.topErrors[0].count, 1);
+  });
+
+  test('log vacío no rompe', () => {
+    const s = buildStats([]);
+    assert.equal(s.totals.queries, 0);
+    assert.equal(s.exercises.length, 0);
+    assert.deepEqual(s.recent, []);
   });
 });
