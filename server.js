@@ -1193,14 +1193,36 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-app.listen(port, () => {
-  console.log(`WebSQL runner listening on port ${port}`);
-  warmSqlServerPoolIfEnabled().catch(() => null);
-});
-
-['SIGTERM', 'SIGINT'].forEach((signal) => {
-  process.on(signal, async () => {
-    await closePools();
-    process.exit(0);
+// Solo arranca el servidor cuando se ejecuta directamente (no al importarlo
+// desde los tests, que reutilizan las funciones puras de abajo).
+if (require.main === module) {
+  app.listen(port, () => {
+    console.log(`WebSQL runner listening on port ${port}`);
+    warmSqlServerPoolIfEnabled().catch(() => null);
   });
-});
+
+  ['SIGTERM', 'SIGINT'].forEach((signal) => {
+    process.on(signal, async () => {
+      await closePools();
+      process.exit(0);
+    });
+  });
+}
+
+// Funciones puras expuestas para pruebas unitarias.
+module.exports = {
+  databasePlatforms,
+  normalizePlatform,
+  normalizeDatabaseKey,
+  isDatabaseAvailable,
+  splitSqlStatements,
+  getLeadingSqlKeyword,
+  isReadOnlyStatement,
+  normalizeNumericString,
+  normalizeCellValue,
+  buildRowKey,
+  diffRowMultisets,
+  compareExerciseResults,
+  usesSelectStar,
+  detectAntipatterns
+};
