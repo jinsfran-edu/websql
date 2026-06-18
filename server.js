@@ -405,6 +405,7 @@ async function warmSqlServerPoolIfEnabled() {
 
 function getMySqlPool(connection) {
   if (!mysqlPool) {
+    const poolMax = Math.max(1, toInt(process.env.MYSQL_POOL_MAX, 10));
     mysqlPool = mysql.createPool({
       host: connection.host,
       port: toInt(connection.port, 3306),
@@ -414,8 +415,8 @@ function getMySqlPool(connection) {
       ssl: connection.ssl ? {} : undefined,
       connectTimeout: queryTimeoutMs,
       waitForConnections: true,
-      connectionLimit: 3,
-      maxIdle: 3,
+      connectionLimit: poolMax,
+      maxIdle: poolMax,
       idleTimeout: 30000,
       enableKeepAlive: true
     });
@@ -435,7 +436,7 @@ function getPostgreSqlPool(connection) {
       password: connection.password,
       database: connection.database,
       ssl: useSsl ? { rejectUnauthorized: false } : false,
-      max: 3,
+      max: Math.max(1, toInt(process.env.POSTGRES_POOL_MAX, 10)),
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: queryTimeoutMs,
       statement_timeout: queryTimeoutMs,
