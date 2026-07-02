@@ -34,7 +34,7 @@ const EDITOR_WIDTH_KEY = 'websql_editor_width';
 const FONT_MIN = 11;
 const FONT_MAX = 26;
 const EDITOR_WIDTH_MIN = 340;
-const EDITOR_WIDTH_MAX = 820;
+const RESULT_WIDTH_MIN = 360; // los resultados nunca quedan más angostos que esto
 let editorFontSize = 14;
 
 let appSettings = { readOnlyMode: null };
@@ -1057,8 +1057,18 @@ function toggleLayout() {
 
 // ---------- Ancho del editor (divisor arrastrable) ----------
 
+// Tope dinámico: todo el ancho del layout menos sidebar, gaps y un mínimo
+// razonable para el panel de resultados. Así en pantallas anchas el editor
+// puede crecer mucho más que en angostas.
+function maxEditorWidth() {
+  const layoutWidth = layoutEl.getBoundingClientRect().width;
+  const sidebarWidth = 250;
+  const gaps = 32; // 2 gaps de 16px del grid
+  return Math.max(EDITOR_WIDTH_MIN, layoutWidth - sidebarWidth - gaps - RESULT_WIDTH_MIN);
+}
+
 function setEditorWidth(px) {
-  const width = Math.min(EDITOR_WIDTH_MAX, Math.max(EDITOR_WIDTH_MIN, px));
+  const width = Math.min(maxEditorWidth(), Math.max(EDITOR_WIDTH_MIN, px));
   layoutEl.style.setProperty('--editor-w', `${width}px`);
   return width;
 }
