@@ -18,6 +18,7 @@ const {
 const { detectAntipatterns, usesSelectStar } = require('./lib/antipatterns');
 const { compareExerciseResults } = require('./lib/exercise-checker');
 const { buildStats } = require('./lib/stats');
+const { explainSqlError } = require('./lib/error-hints');
 
 dotenv.config();
 
@@ -571,7 +572,8 @@ app.post('/api/query', async (req, res) => {
     }
 
     return res.status(500).json({
-      error: error.message || 'Unexpected error running query'
+      error: error.message || 'Unexpected error running query',
+      hint: await buildErrorHint(error, normalizedPlatform, databaseKey)
     });
   }
 });
@@ -765,10 +767,89 @@ app.post('/api/exercises/:id/check', async (req, res) => {
     }
 
     return res.status(500).json({
-      error: error.message || 'Unexpected error checking exercise'
+      error: error.message || 'Unexpected error checking exercise',
+      hint: await buildErrorHint(error, normalizedPlatform, 'pampero')
     });
   }
 });
+
+const schemaQueries = {
+  sqlserver: `SELECT c.TABLE_SCHEMA, c.TABLE_NAME, c.COLUMN_NAME, c.DATA_TYPE, t.TABLE_TYPE
+              FROM INFORMATION_SCHEMA.COLUMNS c
+              JOIN INFORMATION_SCHEMA.TABLES t
+                ON t.TABLE_SCHEMA = c.TABLE_SCHEMA AND t.TABLE_NAME = c.TABLE_NAME
+              ORDER BY c.TABLE_SCHEMA, c.TABLE_NAME, c.ORDINAL_POSITION`,
+  mysql: `SELECT c.TABLE_SCHEMA, c.TABLE_NAME, c.COLUMN_NAME, c.DATA_TYPE, t.TABLE_TYPE
+          FROM information_schema.COLUMNS c
+          JOIN information_schema.TABLES t
+            ON t.TABLE_SCHEMA = c.TABLE_SCHEMA AND t.TABLE_NAME = c.TABLE_NAME
+          WHERE c.TABLE_SCHEMA = DATABASE()
+          ORDER BY c.TABLE_NAME, c.ORDINAL_POSITION
+          LIMIT 2000`,
+  postgresql: `SELECT c.table_schema, c.table_name, c.column_name, c.data_type, t.table_type
+               FROM information_schema.columns c
+               JOIN information_schema.tables t
+                 ON t.table_schema = c.table_schema AND t.table_name = c.table_name
+               WHERE c.table_schema NOT IN ('pg_catalog', 'information_schema')
+               ORDER BY c.table_schema, c.table_name, c.ordinal_position
+               LIMIT 2000`
+};
+
+async function fetchSchemaTables(platform, databaseKey) {
+  const connection = getConnectionFromEnv(platform, databaseKey);
+  let result;
+
+  if (platform === 'sqlserver') {
+    result = await runSqlServerQuery(connection, schemaQueries.sqlserver);
+  } else if (platform === 'mysql') {
+    result = await runMySqlQuery(connection, schemaQueries.mysql);
+  } else {
+    result = await runPostgreSqlQuery(connection, schemaQueries.postgresql);
+  }
+
+  const tablesMap = new Map();
+  for (const row of result.rows) {
+    const schema = row.TABLE_SCHEMA || row.table_schema || '';
+    const table = row.TABLE_NAME || row.table_name || '';
+    const column = row.COLUMN_NAME || row.column_name || '';
+    const dataType = row.DATA_TYPE || row.data_type || '';
+    const tableType = String(row.TABLE_TYPE || row.table_type || '').toUpperCase() === 'VIEW' ? 'view' : 'table';
+    const key = `${schema}.${table}`;
+
+    if (!tablesMap.has(key)) {
+      tablesMap.set(key, { schema, name: table, type: tableType, columns: [] });
+    }
+    tablesMap.get(key).columns.push({ name: column, type: dataType });
+  }
+
+  return Array.from(tablesMap.values());
+}
+
+// Cache de esquema para las pistas de error: el esquema de las bases del curso
+// es estático, así que se consulta una sola vez por proceso.
+const schemaHintCache = new Map();
+
+async function getSchemaTablesForHints(platform, databaseKey) {
+  const key = `${platform}:${databaseKey}`;
+  if (!schemaHintCache.has(key)) {
+    try {
+      schemaHintCache.set(key, await fetchSchemaTables(platform, databaseKey));
+    } catch (_error) {
+      return null; // sin esquema no hay sugerencias, pero la pista genérica sirve igual
+    }
+  }
+  return schemaHintCache.get(key);
+}
+
+async function buildErrorHint(error, platform, databaseKey) {
+  if (!platform || isQueryTimeoutError(error)) return null;
+  try {
+    const tables = await getSchemaTablesForHints(platform, databaseKey || 'pampero');
+    return explainSqlError(error.message, tables);
+  } catch (_e) {
+    return null;
+  }
+}
 
 app.get('/api/schema', async (req, res) => {
   const platform = normalizePlatform(req.query.platform);
@@ -781,56 +862,8 @@ app.get('/api/schema', async (req, res) => {
     return res.status(400).json({ error: 'Base de datos no disponible para esa plataforma.' });
   }
 
-  const schemaQueries = {
-    sqlserver: `SELECT c.TABLE_SCHEMA, c.TABLE_NAME, c.COLUMN_NAME, c.DATA_TYPE, t.TABLE_TYPE
-                FROM INFORMATION_SCHEMA.COLUMNS c
-                JOIN INFORMATION_SCHEMA.TABLES t
-                  ON t.TABLE_SCHEMA = c.TABLE_SCHEMA AND t.TABLE_NAME = c.TABLE_NAME
-                ORDER BY c.TABLE_SCHEMA, c.TABLE_NAME, c.ORDINAL_POSITION`,
-    mysql: `SELECT c.TABLE_SCHEMA, c.TABLE_NAME, c.COLUMN_NAME, c.DATA_TYPE, t.TABLE_TYPE
-            FROM information_schema.COLUMNS c
-            JOIN information_schema.TABLES t
-              ON t.TABLE_SCHEMA = c.TABLE_SCHEMA AND t.TABLE_NAME = c.TABLE_NAME
-            WHERE c.TABLE_SCHEMA = DATABASE()
-            ORDER BY c.TABLE_NAME, c.ORDINAL_POSITION
-            LIMIT 2000`,
-    postgresql: `SELECT c.table_schema, c.table_name, c.column_name, c.data_type, t.table_type
-                 FROM information_schema.columns c
-                 JOIN information_schema.tables t
-                   ON t.table_schema = c.table_schema AND t.table_name = c.table_name
-                 WHERE c.table_schema NOT IN ('pg_catalog', 'information_schema')
-                 ORDER BY c.table_schema, c.table_name, c.ordinal_position
-                 LIMIT 2000`
-  };
-
   try {
-    const connection = getConnectionFromEnv(platform, databaseKey);
-    let result;
-
-    if (platform === 'sqlserver') {
-      result = await runSqlServerQuery(connection, schemaQueries.sqlserver);
-    } else if (platform === 'mysql') {
-      result = await runMySqlQuery(connection, schemaQueries.mysql);
-    } else {
-      result = await runPostgreSqlQuery(connection, schemaQueries.postgresql);
-    }
-
-    const tablesMap = new Map();
-    for (const row of result.rows) {
-      const schema = row.TABLE_SCHEMA || row.table_schema || '';
-      const table = row.TABLE_NAME || row.table_name || '';
-      const column = row.COLUMN_NAME || row.column_name || '';
-      const dataType = row.DATA_TYPE || row.data_type || '';
-      const tableType = String(row.TABLE_TYPE || row.table_type || '').toUpperCase() === 'VIEW' ? 'view' : 'table';
-      const key = `${schema}.${table}`;
-
-      if (!tablesMap.has(key)) {
-        tablesMap.set(key, { schema, name: table, type: tableType, columns: [] });
-      }
-      tablesMap.get(key).columns.push({ name: column, type: dataType });
-    }
-
-    return res.json({ tables: Array.from(tablesMap.values()) });
+    return res.json({ tables: await fetchSchemaTables(platform, databaseKey) });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }

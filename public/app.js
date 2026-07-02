@@ -17,6 +17,7 @@ const exerciseStatementEl = document.getElementById('exerciseStatement');
 const exerciseCloseEl = document.getElementById('exerciseClose');
 const verifyBtnEl = document.getElementById('verifyBtn');
 const verdictEl = document.getElementById('verdict');
+const errorHintEl = document.getElementById('errorHint');
 const themeToggleEl = document.getElementById('themeToggle');
 const fontIncEl = document.getElementById('fontInc');
 const fontDecEl = document.getElementById('fontDec');
@@ -631,7 +632,7 @@ async function verifyExercise() {
   verifyBtnEl.disabled = true;
   verifyBtnEl.textContent = 'Verificando...';
 
-  const queryText = editor ? editor.getValue() : '';
+  const queryText = getQueryToRun();
   const platform = platformEl.value;
 
   try {
@@ -647,7 +648,11 @@ async function verifyExercise() {
     });
 
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'No se pudo verificar la consulta');
+    if (!response.ok) {
+      const err = new Error(data.error || 'No se pudo verificar la consulta');
+      err.hint = data.hint;
+      throw err;
+    }
 
     renderVerdict(data.correcto, data.feedback, data.advertencias);
 
@@ -662,8 +667,7 @@ async function verifyExercise() {
     }
     saveToHistory(queryText, platform, true);
   } catch (error) {
-    errorEl.classList.remove('hidden');
-    errorEl.textContent = error.message;
+    showError(error.message, error.hint);
     saveToHistory(queryText, platform, false);
   } finally {
     verifyBtnEl.disabled = false;
@@ -730,13 +734,36 @@ function renderRows(columns, rows) {
   tableWrapEl.innerHTML = `<table><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
+// Como en SSMS: si hay texto seleccionado se ejecuta solo eso;
+// permite tener varias consultas escritas y correr una por vez.
+function getQueryToRun() {
+  if (!editor) return '';
+  const selection = editor.getSelection();
+  const model = editor.getModel();
+  if (selection && model && !selection.isEmpty()) {
+    return model.getValueInRange(selection);
+  }
+  return editor.getValue();
+}
+
 function clearState() {
   errorEl.classList.add('hidden');
   errorEl.textContent = '';
+  errorHintEl.classList.add('hidden');
+  errorHintEl.textContent = '';
   verdictEl.className = 'hidden';
   verdictEl.innerHTML = '';
   tableWrapEl.innerHTML = '';
   metaEl.textContent = '';
+}
+
+function showError(message, hint) {
+  errorEl.classList.remove('hidden');
+  errorEl.textContent = message;
+  if (hint) {
+    errorHintEl.classList.remove('hidden');
+    errorHintEl.textContent = `💡 ${hint}`;
+  }
 }
 
 // Advertencias de buenas prácticas sin veredicto (para "Ejecutar consulta")
@@ -753,7 +780,7 @@ async function executeQuery() {
   executeBtnEl.disabled = true;
   executeBtnEl.textContent = 'Ejecutando...';
 
-  const queryText = editor ? editor.getValue() : '';
+  const queryText = getQueryToRun();
   const platform = platformEl.value;
   const database = databaseEl.value;
 
@@ -771,7 +798,11 @@ async function executeQuery() {
     });
 
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'No se pudo ejecutar la consulta');
+    if (!response.ok) {
+      const err = new Error(data.error || 'No se pudo ejecutar la consulta');
+      err.hint = data.hint;
+      throw err;
+    }
 
     const timingParts = [`Tiempo total: ${data.durationMs} ms`];
     if (typeof data.connectMs === 'number') timingParts.push(`Conexión: ${data.connectMs} ms`);
@@ -787,8 +818,7 @@ async function executeQuery() {
     renderRows(data.columns || [], data.rows || []);
     saveToHistory(queryText, platform, true, database);
   } catch (error) {
-    errorEl.classList.remove('hidden');
-    errorEl.textContent = error.message;
+    showError(error.message, error.hint);
     saveToHistory(queryText, platform, false, database);
   } finally {
     executeBtnEl.disabled = false;

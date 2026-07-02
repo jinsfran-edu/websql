@@ -818,6 +818,16 @@ td.null-value {
   border: 1px solid var(--warn-border);
 }
 
+.error-hint {
+  background: var(--amber-bg);
+  border: 1px solid var(--amber-border);
+  color: var(--amber-ink);
+  padding: 10px 12px;
+  border-radius: 10px;
+  margin-top: 8px;
+  font-size: 0.88rem;
+}
+
 .hidden {
   display: none;
 }
