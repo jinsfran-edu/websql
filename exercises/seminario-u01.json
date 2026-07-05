@@ -1,0 +1,299 @@
+{
+  "id": "seminario-u01",
+  "nombre": "Seminario de Actualización · U01",
+  "materia": "Seminario de Actualización",
+  "database": "pampero",
+  "orden": 2,
+  "exercises": [
+    {
+      "id": 1,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Usando la tabla Empleados, mostrar el nombre, apellido y una nueva columna llamada Email. El email debe formarse con la primera letra del nombre en minúscula, seguida del apellido completo en minúscula, y el dominio @lujanbuenviaje.edu.ar.",
+      "solucion": {
+        "sqlserver": "SELECT Nombre, Apellido, LOWER(LEFT(Nombre, 1) + Apellido) + '@lujanbuenviaje.edu.ar' AS Email FROM Empleados;"
+      }
+    },
+    {
+      "id": 2,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "En la tabla Clientes, el campo NombreContacto suele tener nombre y apellido. Escribir una consulta que extraiga solo la primera palabra de dicho campo.",
+      "solucion": {
+        "sqlserver": "SELECT NombreContacto, LEFT(NombreContacto, CHARINDEX(' ', NombreContacto + ' ') - 1) AS PrimeraPalabra FROM Clientes;"
+      }
+    },
+    {
+      "id": 3,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Utilizando la tabla Productos, mostrar el NombreProducto y una columna que indique cuántas veces aparece la letra \"a\" (en minúscula) en cada nombre.",
+      "solucion": {
+        "sqlserver": "SELECT NombreProducto, LEN(NombreProducto) - LEN(REPLACE(NombreProducto COLLATE Latin1_General_CS_AS, 'a', '')) AS CantidadA FROM Productos;"
+      }
+    },
+    {
+      "id": 4,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "En la tabla Proveedores, mostrar el NombreEmpresa y crear un CodigoSeguridad que consista en las últimas 3 letras de la ciudad en mayúsculas, seguidas de la longitud del nombre de la empresa.",
+      "solucion": {
+        "sqlserver": "SELECT NombreEmpresa, CONCAT(UPPER(RIGHT(Ciudad, 3)), LEN(NombreEmpresa)) AS CodigoSeguridad FROM Proveedores;"
+      }
+    },
+    {
+      "id": 5,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Si tuvieras una cadena con ceros a la izquierda (por ejemplo, '00012345'), escribe una consulta que los elimine sin usar TRIM (simulando versiones anteriores de SQL Server).",
+      "solucion": {
+        "sqlserver": "SELECT SUBSTRING('00012345', PATINDEX('%[^0]%', '00012345'), LEN('00012345')) AS SinCeros;"
+      }
+    },
+    {
+      "id": 6,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "En la tabla Empleados, mostrar una columna que contenga las iniciales del nombre y el apellido entre corchetes, por ejemplo: [N.D.].",
+      "solucion": {
+        "sqlserver": "SELECT '[' + LEFT(Nombre, 1) + '.' + LEFT(Apellido, 1) + '.]' AS Iniciales FROM Empleados;"
+      }
+    },
+    {
+      "id": 7,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Tomar el campo NombreEmpresa de la tabla Clientes y mostrarlo reemplazando todos los espacios por guiones medios (-) y todas las comas por puntos (.).",
+      "solucion": {
+        "sqlserver": "SELECT REPLACE(REPLACE(NombreEmpresa, ' ', '-'), ',', '.') AS NombreEmpresa FROM Clientes;"
+      }
+    },
+    {
+      "id": 8,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Utilizando la tabla Productos, mostrar el nombre del producto y la posición donde comienza el primer dígito numérico que aparezca en el campo CantidadPorUnidad. Si no tiene números, debe mostrar 0.",
+      "solucion": {
+        "sqlserver": "SELECT NombreProducto, PATINDEX('%[0-9]%', CantidadPorUnidad) AS PosPrimerDigito FROM Productos;"
+      }
+    },
+    {
+      "id": 9,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "En la tabla Clientes, mostrar el campo Ciudad de la siguiente forma: las primeras 3 letras de la ciudad invertidas y en mayúsculas.",
+      "solucion": {
+        "sqlserver": "SELECT Ciudad, UPPER(REVERSE(LEFT(Ciudad, 3))) AS CiudadInvertida FROM Clientes;"
+      }
+    },
+    {
+      "id": 10,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Escribir una consulta que compare la ciudad de un cliente con la palabra 'Londres' y devuelva un valor del 0 al 4 según su parecido fonético en inglés.",
+      "solucion": {
+        "sqlserver": "SELECT Ciudad, DIFFERENCE(Ciudad, 'Londres') AS Parecido FROM Clientes;"
+      }
+    },
+    {
+      "id": 11,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Consultar de la tabla Pedidos los pedidos realizados en junio de 2020.",
+      "solucion": {
+        "sqlserver": "SELECT IdPedido, FechaPedido, IDCliente, IDEmpleado\nFROM Pedidos\nWHERE YEAR(FechaPedido) = 2020 AND MONTH(FechaPedido) = 6;"
+      }
+    },
+    {
+      "id": 12,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Consultar de la tabla Pedidos los pedidos realizados el último día del mes.",
+      "solucion": {
+        "sqlserver": "SELECT IDPedido, FechaPedido, IDCliente, IDEmpleado\nFROM Pedidos\nWHERE DAY(FechaPedido) = DAY(EOMONTH(FechaPedido));"
+      }
+    },
+    {
+      "id": 13,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Consultar de la tabla Pedidos los pedidos realizados el día anterior al último día del mes.",
+      "solucion": {
+        "sqlserver": "SELECT IDPedido, FechaPedido, IDCliente, IDEmpleado\nFROM Pedidos\nWHERE DAY(FechaPedido) = DAY(EOMONTH(FechaPedido))-1;"
+      }
+    },
+    {
+      "id": 14,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Consultar de la tabla Empleados los empleados cuyo apellido contenga al menos dos letras \"e\".",
+      "solucion": {
+        "sqlserver": "SELECT IDEmpleado, Nombre, Apellido\nFROM Empleados\nWHERE Apellido LIKE '%e%e%';"
+      }
+    },
+    {
+      "id": 15,
+      "dificultad": "media",
+      "ordenado": true,
+      "enunciado": "De la tabla Detalles Pedido listar para cada pedido (IDPedido) y su valor total (cantidad x preciounitario), pero mostrando solo aquellos pedidos para los que el total supere los 10.000, y ordenados por este valor total de mayor a menor.",
+      "ordenPor": [
+        1
+      ],
+      "solucion": {
+        "sqlserver": "SELECT IDPedido, SUM(Cantidad*PrecioUnitario) AS valortotal\nFROM [Detalles Pedido]\nGROUP BY IDPedido\nHAVING SUM(Cantidad*PrecioUnitario) > 10000\nORDER BY valortotal DESC;"
+      }
+    },
+    {
+      "id": 16,
+      "dificultad": "avanzada",
+      "ordenado": false,
+      "enunciado": "Para realizar una validación de datos, se necesita realizar una consulta sobre la tabla Empleados, que liste los empleados cuyo apellido comience con una letra minúscula (considere que el cotejo de la base es Latin1_General_CI_AS).",
+      "solucion": {
+        "sqlserver": "SELECT IDEmpleado, Apellido\nFROM Empleados\nWHERE Apellido COLLATE Latin1_General_CS_AS LIKE N'[abcdefghijklmnopqrstuvwxyz]%';"
+      }
+    },
+    {
+      "id": 17,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Explique la diferencia entre las siguientes consultas:\n-- Consulta 1\nSELECT IDEmpleado, COUNT(*) AS numordenes FROM Pedidos WHERE FechaPedido < '20220501' GROUP BY IDEmpleado;\n-- Consulta 2\nSELECT IDEmpleado, COUNT(*) AS numordenes FROM Pedidos GROUP BY IDEmpleado HAVING MAX(FechaPedido) < '20220501';",
+      "verificable": false
+    },
+    {
+      "id": 18,
+      "dificultad": "media",
+      "ordenado": true,
+      "enunciado": "Escribir una consulta contra la tabla Pedidos que devuelva los tres países (PaisEnvio) con el costo promedio de flete más alto durante 2020.",
+      "ordenPor": [
+        1
+      ],
+      "solucion": {
+        "sqlserver": "SELECT TOP (3) PaisEnvio, AVG(Flete) AS fletepromedio\nFROM Pedidos\nWHERE FechaPedido >= '20200101' AND FechaPedido < '20210101'\nGROUP BY PaisEnvio\nORDER BY fletepromedio DESC;"
+      }
+    },
+    {
+      "id": 19,
+      "dificultad": "media",
+      "ordenado": true,
+      "enunciado": "Ídem consulta anterior, pero sin utilizar TOP.",
+      "ordenPor": [
+        1
+      ],
+      "solucion": {
+        "sqlserver": "SELECT PaisEnvio, AVG(Flete) AS fletepromedio\nFROM Pedidos\nWHERE FechaPedido >= '20200101' AND FechaPedido < '20210101'\nGROUP BY PaisEnvio\nORDER BY fletepromedio DESC\nOFFSET 0 ROWS FETCH NEXT 3 ROWS ONLY;"
+      }
+    },
+    {
+      "id": 20,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Usando la tabla Empleados, escribir una consulta que devuelva los siguientes campos: IDEmpleado, Nombre, Apellido, Saludo y Sexo. Sexo no es un campo de la tabla, es un valor que deberán devolver basado en el campo Saludo. Si saludo es \"Srta.\" o \"Sra.\" devolver \"Femenino\", si es \"Sr.\" devolver \"Masculino\", en otros casos, devolver \"Desconocido\".",
+      "solucion": {
+        "sqlserver": "SELECT IDEmpleado, Nombre, Apellido, Saludo, \nCASE Saludo\nWHEN 'Srta.' THEN 'Femenino'\nWHEN 'Sra.' THEN 'Femenino'\nWHEN 'Sr.' THEN 'Masculino'\nELSE 'Desconocido'\nEND AS Sexo\nFROM Empleados;"
+      }
+    },
+    {
+      "id": 21,
+      "dificultad": "media",
+      "ordenado": true,
+      "enunciado": "Escribir una consulta a la tabla Clientes que devuelva para cada cliente su id (IDCliente) y la región. El resultado debe estar ordenado por región, pero aquellas filas que tengan NULL en el campo región deben quedar al final del listado (no al principio, como quedarían por default).",
+      "ordenPor": [
+        1
+      ],
+      "solucion": {
+        "sqlserver": "SELECT IDCliente, Region\nFROM Clientes\nORDER BY\nCASE WHEN Region IS NULL THEN 1 ELSE 0 END, Region;"
+      }
+    },
+    {
+      "id": 22,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Calcule su diferencia de edad en días con cada empleado de la tabla Empleados. Ordenar de mayor a menor diferencia. (Sin autocorrección: el resultado depende de la fecha de nacimiento de cada estudiante.)",
+      "verificable": false
+    },
+    {
+      "id": 23,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Mostrar la edad actual de los empleados en años, meses, días, horas y minutos. (Sin autocorrección: el resultado cambia según el momento de ejecución.)",
+      "verificable": false
+    },
+    {
+      "id": 24,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "¿Cuántos pedidos fueron despachados fuera de término?",
+      "solucion": {
+        "sqlserver": "SELECT COUNT(IDPedido) AS CantFT\nFROM Pedidos\nWHERE FechaEnvio > FechaRequerida OR FechaEnvio IS NULL AND FechaRequerida < GETDATE();"
+      }
+    },
+    {
+      "id": 25,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Ídem consulta anterior, pero mostrar la información agrupada por año de emisión del pedido.",
+      "solucion": {
+        "sqlserver": "SELECT YEAR(FechaPedido) AS Anio, COUNT(IDPedido) AS CantFT\nFROM Pedidos\nWHERE FechaEnvio > FechaRequerida OR FechaEnvio IS NULL AND FechaRequerida < GETDATE()\nGROUP BY YEAR(FechaPedido);"
+      }
+    },
+    {
+      "id": 26,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "¿Cuál fue el año con mayor cantidad de despachos fuera de término?",
+      "solucion": {
+        "sqlserver": "SELECT TOP (1) YEAR(FechaPedido) AS Anio\nFROM Pedidos\nWHERE FechaEnvio > FechaRequerida OR FechaEnvio IS NULL AND FechaRequerida < GETDATE()\nGROUP BY YEAR(FechaPedido)\nORDER BY COUNT(IDPedido) DESC;"
+      }
+    },
+    {
+      "id": 27,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Mostrar los números de pedido y la cantidad de días de atraso (mostrar sólo los pedidos con atraso). (Sin autocorrección: para los pedidos sin despachar, los días de atraso dependen del momento de ejecución.)",
+      "verificable": false
+    },
+    {
+      "id": 28,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Calcular la cantidad de pedidos emitidos en 2020.",
+      "solucion": {
+        "sqlserver": "SELECT COUNT(IDPedido) AS Cant2020\nFROM Pedidos\nWHERE FechaPedido >= '20200101' AND FechaPedido < '20210101'"
+      }
+    },
+    {
+      "id": 29,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Ídem consulta anterior, pero mostrar la información agrupada por semana (utilizar DATEPART).",
+      "solucion": {
+        "sqlserver": "SELECT DATEPART(WEEK, FechaPedido) AS Semana,  COUNT(IDPedido) AS Cant2020\nFROM Pedidos\nWHERE FechaPedido >= '20200101' AND FechaPedido < '20210101'\nGROUP BY DATEPART(WEEK, FechaPedido);"
+      }
+    },
+    {
+      "id": 30,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Ídem consulta anterior, pero sin utilizar DATEPART.",
+      "solucion": {
+        "sqlserver": "SELECT DATEDIFF(WEEK, '20200101', FechaPedido)+1 AS Semana,  COUNT(IDPedido) AS Cant2020\nFROM Pedidos\nWHERE FechaPedido >= '20200101' AND FechaPedido < '20210101'\nGROUP BY DATEDIFF(WEEK, '20200101', FechaPedido)+1;"
+      }
+    },
+    {
+      "id": 31,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Ídem consulta anterior, utilizando DATEPART, pero no se puede utilizar \"week\" como part.",
+      "solucion": {
+        "sqlserver": "SELECT DATEPART(ISO_WEEK, FechaPedido) AS Semana,  COUNT(IDPedido) AS Cant2020\nFROM Pedidos\nWHERE FechaPedido >= '20200101' AND FechaPedido < '20210101'\nGROUP BY DATEPART(ISO_WEEK, FechaPedido);"
+      }
+    },
+    {
+      "id": 32,
+      "dificultad": "avanzada",
+      "ordenado": false,
+      "enunciado": "Compare los resultados de las consultas de las semanas (DATEPART WEEK, DATEDIFF e ISO_WEEK). ¿En las tres se obtiene el mismo resultado? Si realiza las consultas considerando el año 2021 (en lugar de 2020), ¿las tres consultas dan los mismos resultados entre sí? ¿Por qué?",
+      "verificable": false
+    }
+  ]
+}
