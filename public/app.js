@@ -95,9 +95,17 @@ function updateDatabaseOptions() {
 const HISTORY_KEY = 'websql_query_history';
 const HISTORY_MAX = 25;
 const EXERCISES_DONE_KEY = 'websql_exercises_done';
+const GUIDE_KEY = 'websql_active_guide';
+// Guía original, para migrar el progreso guardado antes de que existieran guías
+const LEGACY_GUIDE_ID = 'bbdd1-u4';
 
-let exercises = [];
+let guides = [];
+let activeGuideId = null;
 let activeExercise = null;
+
+function activeGuide() {
+  return guides.find((g) => g.id === activeGuideId) || null;
+}
 
 // Dialect-specific keyword/function lists
 const KEYWORDS = {
@@ -509,15 +517,34 @@ function switchSideTab(name) {
 function loadExercisesDone() {
   try {
     const parsed = JSON.parse(localStorage.getItem(EXERCISES_DONE_KEY) || '{}');
-    return parsed && typeof parsed === 'object' ? parsed : {};
+    if (!parsed || typeof parsed !== 'object') return {};
+    // Migración: las claves numéricas son de antes de que existieran guías
+    let migrated = false;
+    for (const key of Object.keys(parsed)) {
+      if (/^\d+$/.test(key)) {
+        parsed[`${LEGACY_GUIDE_ID}:${key}`] = parsed[key];
+        delete parsed[key];
+        migrated = true;
+      }
+    }
+    if (migrated) {
+      try {
+        localStorage.setItem(EXERCISES_DONE_KEY, JSON.stringify(parsed));
+      } catch (_e) { /* opcional */ }
+    }
+    return parsed;
   } catch (_e) {
     return {};
   }
 }
 
-function markExerciseDone(id) {
+function doneKey(guideId, exerciseId) {
+  return `${guideId}:${exerciseId}`;
+}
+
+function markExerciseDone(guideId, id) {
   const done = loadExercisesDone();
-  done[id] = true;
+  done[doneKey(guideId, id)] = true;
   try {
     localStorage.setItem(EXERCISES_DONE_KEY, JSON.stringify(done));
   } catch (_e) {
@@ -531,38 +558,71 @@ async function loadExercises() {
     const response = await fetch('/api/exercises');
     if (!response.ok) throw new Error('No se pudieron cargar los ejercicios');
     const data = await response.json();
-    exercises = Array.isArray(data.exercises) ? data.exercises : [];
+    guides = Array.isArray(data.guides) ? data.guides : [];
   } catch (_e) {
-    exercises = [];
+    guides = [];
   }
+
+  const storedGuide = localStorage.getItem(GUIDE_KEY);
+  activeGuideId = guides.some((g) => g.id === storedGuide) ? storedGuide : (guides[0] ? guides[0].id : null);
   renderExerciseList();
 }
 
+function switchGuide(guideId) {
+  activeGuideId = guideId;
+  try {
+    localStorage.setItem(GUIDE_KEY, guideId);
+  } catch (_e) { /* opcional */ }
+  closeExercise();
+}
+
 function renderExerciseList() {
-  if (!exercises.length) {
+  const guide = activeGuide();
+  if (!guide) {
     exerciseListEl.innerHTML = '<p class="side-empty">No hay ejercicios cargados.</p>';
     return;
   }
 
+  const exercises = guide.exercises || [];
   const done = loadExercisesDone();
-  const doneCount = exercises.filter((ex) => done[ex.id]).length;
+  const doneCount = exercises.filter((ex) => done[doneKey(guide.id, ex.id)]).length;
+  const verifiableCount = exercises.filter((ex) => ex.verificable !== false).length;
 
   exerciseListEl.innerHTML = '';
 
+  // Selector de guía (solo si hay más de una)
+  if (guides.length > 1) {
+    const selectEl = document.createElement('select');
+    selectEl.className = 'guide-select';
+    for (const g of guides) {
+      const option = document.createElement('option');
+      option.value = g.id;
+      option.textContent = g.nombre;
+      if (g.id === guide.id) option.selected = true;
+      selectEl.appendChild(option);
+    }
+    selectEl.addEventListener('change', () => switchGuide(selectEl.value));
+    exerciseListEl.appendChild(selectEl);
+  }
+
   const progressEl = document.createElement('p');
   progressEl.className = 'exercise-progress';
-  progressEl.textContent = `${doneCount}/${exercises.length} resueltos`;
+  progressEl.textContent = verifiableCount > 0
+    ? `${doneCount}/${verifiableCount} resueltos`
+    : 'Guía sin autocorrección';
   exerciseListEl.appendChild(progressEl);
 
   for (const exercise of exercises) {
     const itemEl = document.createElement('button');
     itemEl.type = 'button';
+    const isDone = done[doneKey(guide.id, exercise.id)];
     itemEl.className = 'exercise-item'
-      + (done[exercise.id] ? ' exercise-done' : '')
+      + (isDone ? ' exercise-done' : '')
       + (activeExercise && activeExercise.id === exercise.id ? ' exercise-active' : '');
-    const check = done[exercise.id] ? '✔ ' : '';
+    const check = isDone ? '✔ ' : '';
+    const noCheckBadge = exercise.verificable === false ? ' <span class="exercise-badge badge-nocheck">sin autocorrección</span>' : '';
     itemEl.innerHTML = `
-      <span class="exercise-item-head">${check}Ejercicio ${exercise.id} <span class="exercise-badge badge-${escapeHtml(normalizeDifficulty(exercise.dificultad))}">${escapeHtml(exercise.dificultad)}</span></span>
+      <span class="exercise-item-head">${check}Ejercicio ${exercise.id} <span class="exercise-badge badge-${escapeHtml(normalizeDifficulty(exercise.dificultad))}">${escapeHtml(exercise.dificultad)}</span>${noCheckBadge}</span>
       <span class="exercise-snippet">${escapeHtml(exercise.enunciado.length > 90 ? exercise.enunciado.slice(0, 90) + '…' : exercise.enunciado)}</span>
     `;
     itemEl.title = exercise.enunciado;
@@ -580,10 +640,12 @@ function normalizeDifficulty(dificultad) {
 
 function selectExercise(exercise) {
   activeExercise = exercise;
-  exerciseTitleEl.textContent = `Ejercicio ${exercise.id} · ${exercise.dificultad}`;
+  const guide = activeGuide();
+  const guideName = guide && guides.length > 1 ? ` · ${guide.nombre}` : '';
+  exerciseTitleEl.textContent = `Ejercicio ${exercise.id} · ${exercise.dificultad}${guideName}`;
   exerciseStatementEl.textContent = exercise.enunciado;
   exerciseBoxEl.classList.remove('hidden');
-  verifyBtnEl.classList.remove('hidden');
+  verifyBtnEl.classList.toggle('hidden', exercise.verificable === false);
   updateVerifyAvailability();
   renderExerciseList();
   if (editor) editor.focus();
@@ -598,14 +660,16 @@ function closeExercise() {
 
 function updateVerifyAvailability() {
   if (!activeExercise) return;
+  const guide = activeGuide();
+  const guideDatabase = (guide && guide.database) || 'pampero';
   const platform = platformEl.value;
   const supported = (activeExercise.plataformas || []).includes(platform);
-  const onPampero = databaseEl.value === 'pampero';
-  verifyBtnEl.disabled = !supported || !onPampero;
+  const onGuideDb = databaseEl.value === guideDatabase;
+  verifyBtnEl.disabled = !supported || !onGuideDb;
   if (!supported) {
     verifyBtnEl.title = 'Este ejercicio no tiene solución cargada para la plataforma elegida';
-  } else if (!onPampero) {
-    verifyBtnEl.title = 'Los ejercicios usan la base pampero: cambiá la base para verificar';
+  } else if (!onGuideDb) {
+    verifyBtnEl.title = `Los ejercicios de esta guía usan la base ${guideDatabase}: cambiá la base para verificar`;
   } else {
     verifyBtnEl.title = 'Compara tu resultado con el esperado';
   }
@@ -641,7 +705,7 @@ async function verifyExercise() {
       throw new Error('Solo se permite verificar una consulta por vez.');
     }
 
-    const response = await fetch(`/api/exercises/${activeExercise.id}/check`, {
+    const response = await fetch(`/api/exercises/${activeGuideId}/${activeExercise.id}/check`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ platform, query: queryText })
@@ -663,7 +727,7 @@ async function verifyExercise() {
     renderRows(data.columns || [], data.rows || []);
 
     if (data.correcto) {
-      markExerciseDone(activeExercise.id);
+      markExerciseDone(activeGuideId, activeExercise.id);
     }
     saveToHistory(queryText, platform, true);
   } catch (error) {

@@ -1,0 +1,435 @@
+{
+  "id": "seminario-u03",
+  "nombre": "Seminario de Actualización · U03",
+  "materia": "Seminario de Actualización",
+  "database": "pampero",
+  "orden": 3,
+  "exercises": [
+    {
+      "id": 1,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Listar los productos cuyo precio unitario (PrecioUnitario) sea mayor al precio unitario promedio de todos los productos (subconsulta escalar).",
+      "solucion": {
+        "sqlserver": "SELECT IDProducto, NombreProducto, PrecioUnitario\nFROM Productos\nWHERE PrecioUnitario > (SELECT AVG(PrecioUnitario) FROM Productos);"
+      }
+    },
+    {
+      "id": 2,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Listar los territorios (IDTerritorio, DescripcionTerritorio) que no tienen ningún empleado asignado en EmpleadoTerritorios (subconsulta multivaluada con NOT IN).",
+      "solucion": {
+        "sqlserver": "SELECT IDTerritorio, DescripcionTerritorio\nFROM Territorios\nWHERE IDTerritorio NOT IN (SELECT IDTerritorio FROM EmpleadoTerritorios);"
+      }
+    },
+    {
+      "id": 3,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Listar los productos suministrados por proveedores (Proveedores) ubicados en Alemania (subconsulta multivaluada con IN).",
+      "solucion": {
+        "sqlserver": "SELECT IDProducto, NombreProducto, IDProveedor\nFROM Productos\nWHERE IDProveedor IN (SELECT IDProveedor FROM Proveedores WHERE Pais = 'Alemania');"
+      }
+    },
+    {
+      "id": 4,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Listar los clientes que nunca realizaron un pedido (subconsulta correlacionada con NOT EXISTS).",
+      "solucion": {
+        "sqlserver": "SELECT IDCliente, NombreEmpresa\nFROM Clientes AS C\nWHERE NOT EXISTS (SELECT 1 FROM Pedidos AS P WHERE P.IDCliente = C.IDCliente);"
+      }
+    },
+    {
+      "id": 5,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Listar los pedidos (IDPedido) cuyo flete (Flete) sea mayor al flete promedio de los pedidos despachados por el mismo transportista (EnvioPor); subconsulta correlacionada en el WHERE.",
+      "solucion": {
+        "sqlserver": "SELECT P.IDPedido, P.EnvioPor, P.Flete\nFROM Pedidos AS P\nWHERE P.Flete > (\n    SELECT AVG(P2.Flete) FROM Pedidos AS P2 WHERE P2.EnvioPor = P.EnvioPor\n);"
+      }
+    },
+    {
+      "id": 6,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Listar los empleados que tienen al menos un pedido con destino (PaisEnvio) a 'Mexico' (subconsulta correlacionada con EXISTS).",
+      "solucion": {
+        "sqlserver": "SELECT IDEmpleado, Apellido, Nombre\nFROM Empleados AS E\nWHERE EXISTS (\n    SELECT 1 FROM Pedidos AS P WHERE P.IDEmpleado = E.IDEmpleado AND P.PaisEnvio = 'Mexico'\n);"
+      }
+    },
+    {
+      "id": 7,
+      "dificultad": "avanzada",
+      "ordenado": false,
+      "enunciado": "Listar los clientes que compraron TODOS los productos de la categoría 'Bebidas' (división relacional con doble NOT EXISTS).",
+      "solucion": {
+        "sqlserver": "SELECT C.IDCliente, C.NombreEmpresa\nFROM Clientes AS C\nWHERE NOT EXISTS (\n    SELECT 1\n    FROM Productos AS PR\n    INNER JOIN Categorias AS CAT ON CAT.IDCategoria = PR.IDCategoria\n    WHERE CAT.NombreCategoria = 'Bebidas'\n      AND NOT EXISTS (\n          SELECT 1\n          FROM Pedidos AS P\n          INNER JOIN [Detalles Pedido] AS DP ON DP.IDPedido = P.IDPedido\n          WHERE P.IDCliente = C.IDCliente AND DP.IDProducto = PR.IDProducto\n      )\n);"
+      }
+    },
+    {
+      "id": 8,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Mostrar, para cada categoría, el nombre del producto más caro de esa categoría (subconsulta escalar correlacionada con TOP).",
+      "solucion": {
+        "sqlserver": "SELECT CAT.NombreCategoria,\n       (SELECT TOP 1 PR.NombreProducto FROM Productos AS PR\n        WHERE PR.IDCategoria = CAT.IDCategoria ORDER BY PR.PrecioUnitario DESC) AS ProductoMasCaro\nFROM Categorias AS CAT;"
+      }
+    },
+    {
+      "id": 9,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Listar los empleados cuya cantidad de pedidos gestionados sea mayor al promedio de pedidos por empleado (subconsulta en el FROM combinada con HAVING).",
+      "solucion": {
+        "sqlserver": "SELECT IDEmpleado, COUNT(*) AS CantidadPedidos\nFROM Pedidos\nGROUP BY IDEmpleado\nHAVING COUNT(*) > (\n    SELECT AVG(Cnt) FROM (SELECT COUNT(*) AS Cnt FROM Pedidos GROUP BY IDEmpleado) AS Sub\n);"
+      }
+    },
+    {
+      "id": 10,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Listar los productos cuyo precio unitario sea mayor al de TODOS los productos de la categoría 'Condimentos'",
+      "solucion": {
+        "sqlserver": "SELECT IDProducto, NombreProducto, PrecioUnitario\nFROM Productos\nWHERE PrecioUnitario > ALL (\n    SELECT PrecioUnitario FROM Productos AS PR\n    INNER JOIN Categorias AS CAT ON CAT.IDCategoria = PR.IDCategoria\n    WHERE CAT.NombreCategoria = 'Condimentos'\n);"
+      }
+    },
+    {
+      "id": 11,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Usando una tabla derivada, mostrar el total facturado (Cantidad * PrecioUnitario * (1-Descuento)) por pedido, solo para los pedidos cuyo total supere 5000.",
+      "solucion": {
+        "sqlserver": "SELECT TotalesPedido.IDPedido, TotalesPedido.Total\nFROM (\n    SELECT IDPedido, SUM(Cantidad * PrecioUnitario * (1 - Descuento)) AS Total\n    FROM [Detalles Pedido]\n    GROUP BY IDPedido\n) AS TotalesPedido\nWHERE TotalesPedido.Total > 5000\nORDER BY TotalesPedido.Total DESC;"
+      }
+    },
+    {
+      "id": 12,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "A partir de la tabla derivada del ejercicio 11, calcular cuántos pedidos “grandes” (Total > 5000) tiene cada cliente.",
+      "solucion": {
+        "sqlserver": "SELECT P.IDCliente, COUNT(*) AS PedidosGrandes\nFROM Pedidos AS P\nINNER JOIN (\n    SELECT IDPedido, SUM(Cantidad * PrecioUnitario * (1 - Descuento)) AS Total\n    FROM [Detalles Pedido]\n    GROUP BY IDPedido\n) AS TotalesPedido ON TotalesPedido.IDPedido = P.IDPedido\nWHERE TotalesPedido.Total > 5000\nGROUP BY P.IDCliente;"
+      }
+    },
+    {
+      "id": 13,
+      "dificultad": "avanzada",
+      "ordenado": false,
+      "enunciado": "Mediante una tabla derivada con ROW_NUMBER, mostrar el producto más vendido (en cantidad total) de cada categoría.",
+      "solucion": {
+        "sqlserver": "SELECT NombreCategoria, NombreProducto, CantidadTotal\nFROM (\n    SELECT CAT.NombreCategoria, PR.NombreProducto,\n           SUM(DP.Cantidad) AS CantidadTotal,\n           ROW_NUMBER() OVER (PARTITION BY CAT.IDCategoria ORDER BY SUM(DP.Cantidad) DESC) AS Orden\n    FROM [Detalles Pedido] AS DP\n    INNER JOIN Productos AS PR ON PR.IDProducto = DP.IDProducto\n    INNER JOIN Categorias AS CAT ON CAT.IDCategoria = PR.IDCategoria\n    GROUP BY CAT.NombreCategoria, CAT.IDCategoria, PR.NombreProducto\n) AS Ranking\nWHERE Orden = 1;"
+      }
+    },
+    {
+      "id": 14,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Reescribir el ejercicio 11 utilizando una CTE en lugar de una tabla derivada.",
+      "solucion": {
+        "sqlserver": "WITH TotalesPedido AS (\n    SELECT IDPedido, SUM(Cantidad * PrecioUnitario * (1 - Descuento)) AS Total\n    FROM [Detalles Pedido]\n    GROUP BY IDPedido\n)\nSELECT IDPedido, Total\nFROM TotalesPedido\nWHERE Total > 5000\nORDER BY Total DESC;"
+      }
+    },
+    {
+      "id": 15,
+      "dificultad": "avanzada",
+      "ordenado": false,
+      "enunciado": "Usando dos CTE encadenadas, mostrar para cada cliente el porcentaje que representa su gasto total sobre el gasto total de todos los clientes.",
+      "solucion": {
+        "sqlserver": "WITH GastoPorCliente AS (\n    SELECT P.IDCliente, SUM(DP.Cantidad * DP.PrecioUnitario * (1 - DP.Descuento)) AS GastoCliente\n    FROM Pedidos AS P\n    INNER JOIN [Detalles Pedido] AS DP ON DP.IDPedido = P.IDPedido\n    GROUP BY P.IDCliente\n),\nGastoTotal AS (\n    SELECT SUM(GastoCliente) AS Total FROM GastoPorCliente\n)\nSELECT G.IDCliente, G.GastoCliente,\n       CAST(100.0 * G.GastoCliente / T.Total AS DECIMAL(5,2)) AS Porcentaje\nFROM GastoPorCliente AS G\nCROSS JOIN GastoTotal AS T\nORDER BY Porcentaje DESC;"
+      }
+    },
+    {
+      "id": 16,
+      "dificultad": "avanzada",
+      "ordenado": false,
+      "enunciado": "Usando una CTE recursiva, mostrar el organigrama completo de Empleados (jefe → subordinados) indicando el nivel jerárquico de cada uno, comenzando por el empleado sin jefe (JefeID IS NULL).",
+      "solucion": {
+        "sqlserver": "WITH Organigrama AS (\n    SELECT IDEmpleado, Apellido, Nombre, JefeID, 0 AS Nivel\n    FROM Empleados\n    WHERE JefeID IS NULL\n    UNION ALL\n    SELECT E.IDEmpleado, E.Apellido, E.Nombre, E.JefeID, O.Nivel + 1\n    FROM Empleados AS E\n    INNER JOIN Organigrama AS O ON E.JefeID = O.IDEmpleado\n)\nSELECT Nivel, IDEmpleado, Apellido, Nombre\nFROM Organigrama\nORDER BY Nivel, Apellido;"
+      }
+    },
+    {
+      "id": 17,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Crear una vista llamada VentasPorEmpleado que muestre, para cada empleado, su apellido y el total vendido; luego consultarla para obtener los 3 empleados con mayor venta. (Sin autocorrección: requiere crear objetos o varias sentencias, no disponible en la base compartida.)",
+      "solucion": {
+        "sqlserver": "CREATE VIEW VentasPorEmpleado AS\nSELECT E.IDEmpleado, E.Apellido,\n       SUM(DP.Cantidad * DP.PrecioUnitario * (1 - DP.Descuento)) AS TotalVendido\nFROM Empleados AS E\nINNER JOIN Pedidos AS P ON P.IDEmpleado = E.IDEmpleado\nINNER JOIN [Detalles Pedido] AS DP ON DP.IDPedido = P.IDPedido\nGROUP BY E.IDEmpleado, E.Apellido;\nGO\nSELECT TOP 3 * FROM VentasPorEmpleado ORDER BY TotalVendido DESC;"
+      },
+      "verificable": false
+    },
+    {
+      "id": 18,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Generar todas las combinaciones posibles entre Empleados y Transportistas (CROSS JOIN), mostrando apellido del empleado y nombre del transportista.",
+      "solucion": {
+        "sqlserver": "SELECT E.Apellido, T.NombreEmpresa AS Transportista\nFROM Empleados AS E\nCROSS JOIN Transportistas AS T;"
+      }
+    },
+    {
+      "id": 19,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Listar cada pedido junto con el nombre de la empresa del cliente que lo realizó (INNER JOIN simple).",
+      "solucion": {
+        "sqlserver": "SELECT P.IDPedido, C.NombreEmpresa\nFROM Pedidos AS P\nINNER JOIN Clientes AS C ON C.IDCliente = P.IDCliente;"
+      }
+    },
+    {
+      "id": 20,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Listar pedidos con el nombre del cliente, el apellido del empleado que lo atendió y el nombre del transportista, para pedidos enviados a 'Brasil' (INNER JOIN de 3 tablas).",
+      "solucion": {
+        "sqlserver": "SELECT P.IDPedido, C.NombreEmpresa, E.Apellido, T.NombreEmpresa AS Transportista\nFROM Pedidos AS P\nINNER JOIN Clientes AS C ON C.IDCliente = P.IDCliente\nINNER JOIN Empleados AS E ON E.IDEmpleado = P.IDEmpleado\nINNER JOIN Transportistas AS T ON T.IDTransportista = P.EnvioPor\nWHERE P.PaisEnvio = 'Brasil';"
+      }
+    },
+    {
+      "id": 21,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Listar, para los pedidos enviados a 'Brasil', el detalle completo: cliente, producto, cantidad y subtotal (INNER JOIN de 4 tablas).",
+      "solucion": {
+        "sqlserver": "SELECT C.NombreEmpresa, PR.NombreProducto, DP.Cantidad,\n       DP.Cantidad * DP.PrecioUnitario * (1 - DP.Descuento) AS Subtotal\nFROM Pedidos AS P\nINNER JOIN Clientes AS C ON C.IDCliente = P.IDCliente\nINNER JOIN [Detalles Pedido] AS DP ON DP.IDPedido = P.IDPedido\nINNER JOIN Productos AS PR ON PR.IDProducto = DP.IDProducto\nWHERE P.PaisEnvio = 'Brasil';"
+      }
+    },
+    {
+      "id": 22,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Crear una tabla temporal #RangosPrecio(RangoDesde, RangoHasta, Etiqueta) con 3 rangos de precio y, mediante un NON-EQUI JOIN, clasificar cada producto según el rango en que cae su PrecioUnitario. (Sin autocorrección: requiere crear objetos o varias sentencias, no disponible en la base compartida.)",
+      "solucion": {
+        "sqlserver": "CREATE TABLE #RangosPrecio(\n    RangoDesde decimal(19,4), RangoHasta decimal(19,4), Etiqueta varchar(20)\n);\nINSERT INTO #RangosPrecio VALUES\n(0, 20, 'Económico'), (20.01, 50, 'Medio'), (50.01, 9999, 'Premium');\n \nSELECT PR.NombreProducto, PR.PrecioUnitario, RP.Etiqueta\nFROM Productos AS PR\nINNER JOIN #RangosPrecio AS RP\n    ON PR.PrecioUnitario BETWEEN RP.RangoDesde AND RP.RangoHasta;"
+      },
+      "verificable": false
+    },
+    {
+      "id": 23,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Mostrar cada empleado junto con el apellido de su jefe directo (SELF JOIN sobre Empleados).",
+      "solucion": {
+        "sqlserver": "SELECT E.Apellido AS Empleado, J.Apellido AS Jefe\nFROM Empleados AS E\nLEFT JOIN Empleados AS J ON J.IDEmpleado = E.JefeID;"
+      }
+    },
+    {
+      "id": 24,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Listar todos los clientes y, si los tienen, sus pedidos; incluir a los clientes sin pedidos (LEFT OUTER JOIN).",
+      "solucion": {
+        "sqlserver": "SELECT C.IDCliente, C.NombreEmpresa, P.IDPedido\nFROM Clientes AS C\nLEFT OUTER JOIN Pedidos AS P ON P.IDCliente = C.IDCliente;"
+      }
+    },
+    {
+      "id": 25,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "A partir del ejercicio 24, filtrar únicamente los clientes que NO tienen pedidos. ¿Por qué la condición debe ir en el WHERE y no alcanza con agregarla al ON?",
+      "solucion": {
+        "sqlserver": "SELECT C.IDCliente, C.NombreEmpresa\nFROM Clientes AS C\nLEFT OUTER JOIN Pedidos AS P ON P.IDCliente = C.IDCliente\nWHERE P.IDPedido IS NULL;"
+      }
+    },
+    {
+      "id": 26,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Listar todos los clientes con sus pedidos (si tienen) y, para los pedidos que existan, el apellido del empleado que los atendió, controlando el orden de evaluación de los JOIN para no perder clientes sin pedidos.",
+      "solucion": {
+        "sqlserver": "SELECT C.IDCliente, C.NombreEmpresa, P.IDPedido, E.Apellido\nFROM Clientes AS C\nLEFT OUTER JOIN (\n    Pedidos AS P INNER JOIN Empleados AS E ON E.IDEmpleado = P.IDEmpleado\n) ON P.IDCliente = C.IDCliente;"
+      }
+    },
+    {
+      "id": 27,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Listar los proveedores que tienen al menos un producto discontinuado (Discontinuado = 1), sin repetir proveedores y sin traer columnas de Productos (SEMI-JOIN con EXISTS).",
+      "solucion": {
+        "sqlserver": "SELECT PV.IDProveedor, PV.NombreEmpresa\nFROM Proveedores AS PV\nWHERE EXISTS (\n    SELECT 1 FROM Productos AS PR WHERE PR.IDProveedor = PV.IDProveedor AND PR.Discontinuado = 1\n);"
+      }
+    },
+    {
+      "id": 28,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Listar, para cada empleado, los territorios de venta que tiene asignados junto con el nombre de la región a la que pertenece cada territorio (JOIN a través de la tabla de correlación N:M EmpleadoTerritorios).",
+      "solucion": {
+        "sqlserver": "SELECT E.Apellido, T.DescripcionTerritorio, R.RegionDescripcion\nFROM Empleados AS E\nINNER JOIN EmpleadoTerritorios AS ET ON ET.IDEmpleado = E.IDEmpleado\nINNER JOIN Territorios AS T ON T.IDTerritorio = ET.IDTerritorio\nINNER JOIN Region AS R ON R.IDRegion = T.IDRegion\nORDER BY E.Apellido;"
+      }
+    },
+    {
+      "id": 29,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Obtener una lista única de ciudades (sin duplicados) en las que la empresa tiene clientes o empleados (UNION).",
+      "solucion": {
+        "sqlserver": "SELECT Ciudad FROM Clientes\nUNION\nSELECT Ciudad FROM Empleados;"
+      }
+    },
+    {
+      "id": 30,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Igual al ejercicio 29, pero indicando el origen del dato ('Cliente' u 'Empleado') y permitiendo ciudades repetidas si corresponden a orígenes distintos (UNION ALL).",
+      "solucion": {
+        "sqlserver": "SELECT Ciudad, 'Cliente' AS Origen FROM Clientes\nUNION ALL\nSELECT Ciudad, 'Empleado' AS Origen FROM Empleados;"
+      }
+    },
+    {
+      "id": 31,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Obtener las ciudades en las que la empresa tiene tanto clientes como empleados (INTERSECT).",
+      "solucion": {
+        "sqlserver": "SELECT Ciudad FROM Clientes\nINTERSECT\nSELECT Ciudad FROM Empleados;"
+      }
+    },
+    {
+      "id": 32,
+      "dificultad": "básica",
+      "ordenado": false,
+      "enunciado": "Obtener las ciudades en las que hay clientes pero NO hay empleados (EXCEPT).",
+      "solucion": {
+        "sqlserver": "SELECT Ciudad FROM Clientes\nINTERSECT\nSELECT Ciudad FROM Empleados;"
+      }
+    },
+    {
+      "id": 33,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Obtener los IDCliente de 'Mexico' junto con (los de 'Alemania' que NO empiecen su NombreContacto con 'A'), combinando UNION y EXCEPT con paréntesis para forzar el orden de evaluación. Explicar qué cambiaría sin los paréntesis.",
+      "solucion": {
+        "sqlserver": "SELECT IDCliente FROM Clientes WHERE Pais = 'Mexico'\nUNION\n(\n    SELECT IDCliente FROM Clientes WHERE Pais = 'Alemania'\n    EXCEPT\n    SELECT IDCliente FROM Clientes WHERE NombreContacto LIKE 'A%'\n);"
+      }
+    },
+    {
+      "id": 34,
+      "dificultad": "media",
+      "ordenado": false,
+      "enunciado": "Para cada producto del pedido 10248, calcular qué porcentaje representa su subtotal sobre el total del pedido, usando una función de ventana de agregación (SUM() OVER).",
+      "solucion": {
+        "sqlserver": "SELECT IDProducto, Cantidad * PrecioUnitario * (1 - Descuento) AS Subtotal,\n       CAST(100.0 * (Cantidad * PrecioUnitario * (1 - Descuento))\n            / SUM(Cantidad * PrecioUnitario * (1 - Descuento)) OVER (PARTITION BY IDPedido)\n            AS DECIMAL(5,2)) AS PorcentajeDelPedido\nFROM [Detalles Pedido]\nWHERE IDPedido = 10248;"
+      }
+    },
+    {
+      "id": 35,
+      "dificultad": "media",
+      "ordenado": true,
+      "enunciado": "Para el cliente 'ALFKI', listar sus pedidos ordenados por fecha junto con el total acumulado de flete (Flete) pagado hasta cada pedido (suma corrida).",
+      "solucion": {
+        "sqlserver": "SELECT IDPedido, FechaPedido, Flete,\n       SUM(Flete) OVER (ORDER BY FechaPedido ROWS UNBOUNDED PRECEDING) AS FleteAcumulado\nFROM Pedidos\nWHERE IDCliente = 'ALFKI';"
+      }
+    },
+    {
+      "id": 36,
+      "dificultad": "avanzada",
+      "ordenado": true,
+      "enunciado": "Dentro de cada categoría, ordenar los productos por PrecioUnitario descendente y calcular simultáneamente ROW_NUMBER, RANK y DENSE_RANK. Comparar los resultados cuando hay precios repetidos.",
+      "solucion": {
+        "sqlserver": "SELECT CAT.NombreCategoria, PR.NombreProducto, PR.PrecioUnitario,\n       ROW_NUMBER() OVER (PARTITION BY CAT.IDCategoria ORDER BY PR.PrecioUnitario DESC) AS NroFila,\n       RANK() OVER (PARTITION BY CAT.IDCategoria ORDER BY PR.PrecioUnitario DESC) AS Rank,\n       DENSE_RANK() OVER (PARTITION BY CAT.IDCategoria ORDER BY PR.PrecioUnitario DESC) AS DenseRank\nFROM Productos AS PR\nINNER JOIN Categorias AS CAT ON CAT.IDCategoria = PR.IDCategoria;"
+      }
+    },
+    {
+      "id": 37,
+      "dificultad": "avanzada",
+      "ordenado": true,
+      "enunciado": "Para cada cliente, listar sus pedidos ordenados por fecha y calcular cuántos días pasaron desde el pedido anterior del mismo cliente (función LAG).",
+      "solucion": {
+        "sqlserver": "SELECT IDCliente, IDPedido, FechaPedido,\n       DATEDIFF(DAY,\n           LAG(FechaPedido) OVER (PARTITION BY IDCliente ORDER BY FechaPedido),\n           FechaPedido) AS DiasDesdeUltimoPedido\nFROM Pedidos;"
+      }
+    },
+    {
+      "id": 38,
+      "dificultad": "avanzada",
+      "ordenado": false,
+      "enunciado": "Para cada detalle de pedido, mostrar el nombre del producto más caro de ese mismo pedido (función FIRST_VALUE).",
+      "solucion": {
+        "sqlserver": "SELECT DP.IDPedido, PR.NombreProducto, DP.PrecioUnitario,\n       FIRST_VALUE(PR.NombreProducto) OVER (\n           PARTITION BY DP.IDPedido ORDER BY DP.PrecioUnitario DESC\n       ) AS ProductoMasCaroDelPedido\nFROM [Detalles Pedido] AS DP\nINNER JOIN Productos AS PR ON PR.IDProducto = DP.IDProducto;"
+      }
+    },
+    {
+      "id": 39,
+      "dificultad": "avanzada",
+      "ordenado": false,
+      "enunciado": "Reescribir el ejercicio 34 utilizando la cláusula WINDOW (SQL Server 2022 o superior) para definir una sola vez la ventana y reutilizarla en todas las funciones.",
+      "solucion": {
+        "sqlserver": "SELECT IDPedido, IDProducto, Cantidad, PrecioUnitario, Descuento,\n       SUM(Cantidad * PrecioUnitario * (1 - Descuento)) OVER ven1 AS TotalPedido,\n       AVG(Cantidad * PrecioUnitario * (1 - Descuento)) OVER ven1 AS PromedioPedido,\n       COUNT(*) OVER ven1 AS CantidadItems\nFROM [Detalles Pedido]\nWHERE IDPedido IN (10248, 10249)\nWINDOW ven1 AS (PARTITION BY IDPedido);"
+      }
+    },
+    {
+      "id": 40,
+      "dificultad": "avanzada",
+      "ordenado": false,
+      "enunciado": "Mostrar, para cada empleado, la cantidad de pedidos despachados por cada transportista (Speedy Express, United Package, Federal Shipping), una columna por transportista (CASE + SUM).",
+      "solucion": {
+        "sqlserver": "SELECT IDEmpleado,\n    SUM(CASE WHEN EnvioPor = 1 THEN 1 ELSE 0 END) AS [Speedy Express],\n    SUM(CASE WHEN EnvioPor = 2 THEN 1 ELSE 0 END) AS [United Package],\n    SUM(CASE WHEN EnvioPor = 3 THEN 1 ELSE 0 END) AS [Federal Shipping]\nFROM Pedidos\nGROUP BY IDEmpleado;"
+      }
+    },
+    {
+      "id": 41,
+      "dificultad": "avanzada",
+      "ordenado": false,
+      "enunciado": "Resolver el ejercicio 40 utilizando el operador PIVOT en lugar de CASE + SUM.",
+      "solucion": {
+        "sqlserver": "SELECT IDEmpleado, [1] AS [Speedy Express], [2] AS [United Package], [3] AS [Federal Shipping]\nFROM (\n    SELECT IDEmpleado, EnvioPor FROM Pedidos\n) AS Origen\nPIVOT (\n    COUNT(EnvioPor) FOR EnvioPor IN ([1],[2],[3])\n) AS Pvt;"
+      }
+    },
+    {
+      "id": 42,
+      "dificultad": "avanzada",
+      "ordenado": false,
+      "enunciado": "Generalizar el pivoteo para que las columnas (una por categoría de producto) se generen dinámicamente, mostrando la cantidad de productos discontinuados por categoría, sin codificar a mano los nombres de categoría (PIVOT + SQL dinámico). (Sin autocorrección: requiere crear objetos o varias sentencias, no disponible en la base compartida.)",
+      "solucion": {
+        "sqlserver": "DECLARE @Columnas NVARCHAR(MAX), @SQL NVARCHAR(MAX);\n \nSELECT @Columnas = STRING_AGG(QUOTENAME(NombreCategoria), ',')\nFROM Categorias;\n \nSET @SQL = N'\nSELECT *\nFROM (\n    SELECT CAT.NombreCategoria, PR.Discontinuado\n    FROM Productos AS PR\n    INNER JOIN Categorias AS CAT ON CAT.IDCategoria = PR.IDCategoria\n) AS Origen\nPIVOT (\n    COUNT(Discontinuado) FOR NombreCategoria IN (' + @Columnas + N')\n) AS Pvt;';\n \nEXEC sp_executesql @SQL;"
+      },
+      "verificable": false
+    },
+    {
+      "id": 43,
+      "dificultad": "avanzada",
+      "ordenado": false,
+      "enunciado": "Obtener, en una sola consulta, el total vendido agrupado por categoría, agrupado por año del pedido, y el total general, combinando los tres niveles con GROUPING SETS.",
+      "solucion": {
+        "sqlserver": "SELECT CAT.NombreCategoria, YEAR(P.FechaPedido) AS Anio,\n       SUM(DP.Cantidad * DP.PrecioUnitario * (1 - DP.Descuento)) AS TotalVendido\nFROM Pedidos AS P\nINNER JOIN [Detalles Pedido] AS DP ON DP.IDPedido = P.IDPedido\nINNER JOIN Productos AS PR ON PR.IDProducto = DP.IDProducto\nINNER JOIN Categorias AS CAT ON CAT.IDCategoria = PR.IDCategoria\nGROUP BY GROUPING SETS (\n    (CAT.NombreCategoria),\n    (YEAR(P.FechaPedido)),\n    ()\n);"
+      }
+    },
+    {
+      "id": 44,
+      "dificultad": "avanzada",
+      "ordenado": false,
+      "enunciado": "Usando CUBE, obtener el total vendido combinando todas las combinaciones posibles de Categoría y Año (incluyendo subtotales por cada dimensión y el total general).",
+      "solucion": {
+        "sqlserver": "SELECT CAT.NombreCategoria, YEAR(P.FechaPedido) AS Anio,\n       SUM(DP.Cantidad * DP.PrecioUnitario * (1 - DP.Descuento)) AS TotalVendido\nFROM Pedidos AS P\nINNER JOIN [Detalles Pedido] AS DP ON DP.IDPedido = P.IDPedido\nINNER JOIN Productos AS PR ON PR.IDProducto = DP.IDProducto\nINNER JOIN Categorias AS CAT ON CAT.IDCategoria = PR.IDCategoria\nGROUP BY CUBE(CAT.NombreCategoria, YEAR(P.FechaPedido));"
+      }
+    },
+    {
+      "id": 45,
+      "dificultad": "avanzada",
+      "ordenado": false,
+      "enunciado": "Usando ROLLUP, obtener el total vendido por Pais del cliente y, dentro de cada país, por Ciudad, incluyendo subtotales por país y el total general (jerarquía País → Ciudad).",
+      "solucion": {
+        "sqlserver": "SELECT C.Pais, C.Ciudad,\n       SUM(DP.Cantidad * DP.PrecioUnitario * (1 - DP.Descuento)) AS TotalVendido\nFROM Clientes AS C\nINNER JOIN Pedidos AS P ON P.IDCliente = C.IDCliente\nINNER JOIN [Detalles Pedido] AS DP ON DP.IDPedido = P.IDPedido\nGROUP BY ROLLUP(C.Pais, C.Ciudad);"
+      }
+    },
+    {
+      "id": 46,
+      "dificultad": "avanzada",
+      "ordenado": false,
+      "enunciado": "A partir del ejercicio 45, agregar una columna que indique con una etiqueta legible ('Detalle', 'Subtotal Pais' o 'Total General') qué nivel de agregación representa cada fila, usando GROUPING().",
+      "solucion": {
+        "sqlserver": "SELECT C.Pais, C.Ciudad,\n       SUM(DP.Cantidad * DP.PrecioUnitario * (1 - DP.Descuento)) AS TotalVendido,\n       CASE\n           WHEN GROUPING(C.Pais) = 1 THEN 'Total General'\n           WHEN GROUPING(C.Ciudad) = 1 THEN 'Subtotal Pais'\n           ELSE 'Detalle'\n       END AS NivelAgregacion\nFROM Clientes AS C\nINNER JOIN Pedidos AS P ON P.IDCliente = C.IDCliente\nINNER JOIN [Detalles Pedido] AS DP ON DP.IDPedido = P.IDPedido\nGROUP BY ROLLUP(C.Pais, C.Ciudad);"
+      }
+    },
+    {
+      "id": 47,
+      "dificultad": "avanzada",
+      "ordenado": false,
+      "enunciado": "Reescribir el ejercicio 43 agregando una columna NivelGrouping calculada con GROUPING_ID(NombreCategoria, Anio) que permita identificar, mediante un código numérico, a qué conjunto de agrupación pertenece cada fila.",
+      "solucion": {
+        "sqlserver": "SELECT CAT.NombreCategoria, YEAR(P.FechaPedido) AS Anio,\n       SUM(DP.Cantidad * DP.PrecioUnitario * (1 - DP.Descuento)) AS TotalVendido,\n       GROUPING_ID(CAT.NombreCategoria, YEAR(P.FechaPedido)) AS NivelGrouping\nFROM Pedidos AS P\nINNER JOIN [Detalles Pedido] AS DP ON DP.IDPedido = P.IDPedido\nINNER JOIN Productos AS PR ON PR.IDProducto = DP.IDProducto\nINNER JOIN Categorias AS CAT ON CAT.IDCategoria = PR.IDCategoria\nGROUP BY GROUPING SETS (\n    (CAT.NombreCategoria),\n    (YEAR(P.FechaPedido)),\n    ()\n);"
+      }
+    }
+  ]
+}

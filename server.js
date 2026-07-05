@@ -578,15 +578,27 @@ app.post('/api/query', async (req, res) => {
   }
 });
 
-const exercisesById = new Map();
+// Guías de ejercicios: un JSON por guía en el directorio exercises/
+const guidesById = new Map();
 try {
-  const exercisesData = require('./exercises.json');
-  for (const exercise of exercisesData.exercises || []) {
-    exercisesById.set(String(exercise.id), exercise);
+  const exercisesDir = path.join(__dirname, 'exercises');
+  const guideFiles = require('fs').readdirSync(exercisesDir).filter((file) => file.endsWith('.json'));
+  for (const file of guideFiles) {
+    const guide = require(path.join(exercisesDir, file));
+    if (!guide.id) {
+      console.warn(`Guía sin id ignorada: ${file}`);
+      continue;
+    }
+    const exercisesById = new Map();
+    for (const exercise of guide.exercises || []) {
+      exercisesById.set(String(exercise.id), exercise);
+    }
+    guidesById.set(guide.id, { ...guide, exercisesById });
   }
-  console.log(`Loaded ${exercisesById.size} exercises.`);
+  const total = Array.from(guidesById.values()).reduce((sum, g) => sum + g.exercisesById.size, 0);
+  console.log(`Loaded ${guidesById.size} exercise guides (${total} exercises).`);
 } catch (error) {
-  console.warn(`No exercises loaded: ${error.message}`);
+  console.warn(`No exercise guides loaded: ${error.message}`);
 }
 
 const solutionResultCache = new Map();
@@ -598,10 +610,10 @@ async function runQueryForPlatform(platform, queryText, databaseKey = 'pampero')
   return runPostgreSqlQuery(connection, queryText);
 }
 
-async function getSolutionResult(exercise, platform) {
-  const key = `${exercise.id}:${platform}`;
+async function getSolutionResult(guide, exercise, platform) {
+  const key = `${guide.id}:${exercise.id}:${platform}`;
   if (!solutionResultCache.has(key)) {
-    const result = await runQueryForPlatform(platform, exercise.solucion[platform]);
+    const result = await runQueryForPlatform(platform, exercise.solucion[platform], guide.database || 'pampero');
     solutionResultCache.set(key, { columns: result.columns, rows: result.rows });
   }
   return solutionResultCache.get(key);
@@ -642,28 +654,48 @@ async function getSolutionResult(exercise, platform) {
 
 
 app.get('/api/exercises', (_req, res) => {
-  const list = Array.from(exercisesById.values()).map((exercise) => ({
-    id: exercise.id,
-    dificultad: exercise.dificultad,
-    enunciado: exercise.enunciado,
-    ordenado: Boolean(exercise.ordenado),
-    plataformas: Object.keys(exercise.solucion || {})
-  }));
-  res.json({ exercises: list });
+  const guides = Array.from(guidesById.values())
+    .sort((a, b) => (a.orden || 99) - (b.orden || 99))
+    .map((guide) => ({
+      id: guide.id,
+      nombre: guide.nombre || guide.id,
+      materia: guide.materia || '',
+      database: guide.database || 'pampero',
+      exercises: Array.from(guide.exercisesById.values()).map((exercise) => ({
+        id: exercise.id,
+        dificultad: exercise.dificultad,
+        enunciado: exercise.enunciado,
+        ordenado: Boolean(exercise.ordenado),
+        verificable: exercise.verificable !== false,
+        plataformas: Object.keys(exercise.solucion || {})
+      }))
+    }));
+  res.json({ guides });
 });
 
-app.post('/api/exercises/:id/check', async (req, res) => {
+app.post('/api/exercises/:guide/:id/check', async (req, res) => {
   const startedAt = Date.now();
   let normalizedPlatform = null;
   let queryText = '';
   let exerciseId = null;
+  let guideId = null;
 
   try {
-    const exercise = exercisesById.get(String(req.params.id));
+    const guide = guidesById.get(String(req.params.guide));
+    if (!guide) {
+      return res.status(404).json({ error: 'Guía de ejercicios no encontrada.' });
+    }
+    guideId = guide.id;
+
+    const exercise = guide.exercisesById.get(String(req.params.id));
     if (!exercise) {
       return res.status(404).json({ error: 'Ejercicio no encontrado.' });
     }
     exerciseId = exercise.id;
+
+    if (exercise.verificable === false) {
+      return res.status(400).json({ error: 'Este ejercicio no tiene autocorrección.' });
+    }
 
     const { platform, query } = req.body || {};
     normalizedPlatform = normalizePlatform(platform);
@@ -688,13 +720,14 @@ app.post('/api/exercises/:id/check', async (req, res) => {
       return res.status(400).json({ error: 'Solo se permiten consultas de lectura en la verificación.' });
     }
 
-    const studentResult = await runQueryForPlatform(normalizedPlatform, queryText);
+    const guideDatabase = guide.database || 'pampero';
+    const studentResult = await runQueryForPlatform(normalizedPlatform, queryText, guideDatabase);
 
     let solutionResult;
     try {
-      solutionResult = await getSolutionResult(exercise, normalizedPlatform);
+      solutionResult = await getSolutionResult(guide, exercise, normalizedPlatform);
     } catch (solutionError) {
-      console.error(`Solution query failed for exercise ${exercise.id} (${normalizedPlatform}): ${solutionError.message}`);
+      console.error(`Solution query failed for exercise ${guide.id}/${exercise.id} (${normalizedPlatform}): ${solutionError.message}`);
       return res.status(500).json({ error: 'No se pudo ejecutar la consulta de referencia del ejercicio. Avisale al docente.' });
     }
 
@@ -727,12 +760,14 @@ app.post('/api/exercises/:id/check', async (req, res) => {
       success: true,
       statusCode: 200,
       durationMs,
+      guideId: guide.id,
       exerciseId: exercise.id,
       correcto
     });
 
     return res.json({
       platform: normalizedPlatform,
+      guideId: guide.id,
       exerciseId: exercise.id,
       correcto,
       feedback,
@@ -754,6 +789,7 @@ app.post('/api/exercises/:id/check', async (req, res) => {
       success: false,
       statusCode,
       durationMs: Date.now() - startedAt,
+      guideId,
       exerciseId,
       error: error.message || 'Unexpected error checking exercise'
     }).catch((logError) => {

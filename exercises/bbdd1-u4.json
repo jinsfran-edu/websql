@@ -1,4 +1,9 @@
 {
+  "id": "bbdd1-u4",
+  "nombre": "Base de Datos I · Práctica U4",
+  "materia": "Base de Datos I",
+  "database": "pampero",
+  "orden": 1,
   "exercises": [
     {
       "id": 1,
