@@ -25,6 +25,7 @@ const fontSizeLabelEl = document.getElementById('fontSizeLabel');
 const editorWrapEl = document.getElementById('editorWrap');
 const layoutEl = document.getElementById('layout');
 const colSplitterEl = document.getElementById('colSplitter');
+const sideSplitterEl = document.getElementById('sideSplitter');
 const layoutToggleEl = document.getElementById('layoutToggle');
 
 const THEME_KEY = 'websql_theme';
@@ -36,6 +37,9 @@ const FONT_MIN = 11;
 const FONT_MAX = 26;
 const EDITOR_WIDTH_MIN = 340;
 const RESULT_WIDTH_MIN = 360; // los resultados nunca quedan más angostos que esto
+const SIDE_WIDTH_KEY = 'websql_side_width';
+const SIDE_WIDTH_MIN = 180;
+const SIDE_WIDTH_MAX = 480;
 let editorFontSize = 14;
 
 let appSettings = { readOnlyMode: null };
@@ -1154,17 +1158,85 @@ function toggleLayout() {
 // Tope dinámico: todo el ancho del layout menos sidebar, gaps y un mínimo
 // razonable para el panel de resultados. Así en pantallas anchas el editor
 // puede crecer mucho más que en angostas.
+function currentSideWidth() {
+  const sidePanel = document.querySelector('.side-panel');
+  return sidePanel ? sidePanel.getBoundingClientRect().width : 250;
+}
+
 function maxEditorWidth() {
   const layoutWidth = layoutEl.getBoundingClientRect().width;
-  const sidebarWidth = 250;
   const gaps = 32; // 2 gaps de 16px del grid
-  return Math.max(EDITOR_WIDTH_MIN, layoutWidth - sidebarWidth - gaps - RESULT_WIDTH_MIN);
+  return Math.max(EDITOR_WIDTH_MIN, layoutWidth - currentSideWidth() - gaps - RESULT_WIDTH_MIN);
 }
 
 function setEditorWidth(px) {
   const width = Math.min(maxEditorWidth(), Math.max(EDITOR_WIDTH_MIN, px));
   layoutEl.style.setProperty('--editor-w', `${width}px`);
   return width;
+}
+
+// ---------- Ancho del panel lateral (primera columna) ----------
+
+function setSideWidth(px) {
+  const width = Math.min(SIDE_WIDTH_MAX, Math.max(SIDE_WIDTH_MIN, px));
+  layoutEl.style.setProperty('--side-w', `${width}px`);
+  return width;
+}
+
+function applySavedSideWidth() {
+  const stored = parseInt(localStorage.getItem(SIDE_WIDTH_KEY), 10);
+  if (Number.isFinite(stored)) {
+    setSideWidth(stored);
+  }
+}
+
+function initSideSplitter() {
+  let dragging = false;
+  let startX = 0;
+  let startWidth = 0;
+
+  sideSplitterEl.addEventListener('pointerdown', (event) => {
+    dragging = true;
+    startX = event.clientX;
+    startWidth = currentSideWidth();
+    sideSplitterEl.classList.add('dragging');
+    sideSplitterEl.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+
+  sideSplitterEl.addEventListener('pointermove', (event) => {
+    if (!dragging) return;
+    setSideWidth(startWidth + (event.clientX - startX));
+  });
+
+  function endDrag(event) {
+    if (!dragging) return;
+    dragging = false;
+    sideSplitterEl.classList.remove('dragging');
+    try {
+      sideSplitterEl.releasePointerCapture(event.pointerId);
+    } catch (_e) {
+      // el puntero ya pudo soltarse
+    }
+    try {
+      localStorage.setItem(SIDE_WIDTH_KEY, String(Math.round(currentSideWidth())));
+    } catch (_e) {
+      // preferencia opcional
+    }
+  }
+
+  sideSplitterEl.addEventListener('pointerup', endDrag);
+  sideSplitterEl.addEventListener('pointercancel', endDrag);
+
+  // Doble clic: volver al ancho por defecto
+  sideSplitterEl.addEventListener('dblclick', () => {
+    layoutEl.style.removeProperty('--side-w');
+    try {
+      localStorage.removeItem(SIDE_WIDTH_KEY);
+    } catch (_e) {
+      // preferencia opcional
+    }
+  });
 }
 
 function applySavedEditorWidth() {
@@ -1289,6 +1361,8 @@ applyTheme(isDarkTheme());
 applyLayout(localStorage.getItem(LAYOUT_KEY) === 'below' ? 'below' : 'right');
 applySavedEditorWidth();
 initColumnSplitter();
+applySavedSideWidth();
+initSideSplitter();
 updateDatabaseOptions();
 renderConnectionInfo();
 loadSettings();
