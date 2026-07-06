@@ -204,13 +204,13 @@ h1 {
   display: grid;
   /* El editor tiene ancho fijo (ajustable con el divisor); los resultados usan
      minmax(0, 1fr) para poder encogerse y hacer scroll en vez de empujar el grid. */
-  grid-template-columns: 250px var(--editor-w, 480px) minmax(0, 1fr);
+  grid-template-columns: var(--side-w, 250px) var(--editor-w, 480px) minmax(0, 1fr);
   gap: 16px;
 }
 
 /* Modo "resultados abajo": editor arriba, resultados debajo, sidebar a la izquierda */
 .layout.stack-below {
-  grid-template-columns: 250px minmax(0, 1fr);
+  grid-template-columns: var(--side-w, 250px) minmax(0, 1fr);
   grid-template-areas:
     "side editor"
     "side result";
@@ -423,6 +423,7 @@ select[disabled] {
 }
 
 .side-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -865,7 +866,7 @@ td.null-value {
 @media (max-width: 1180px) {
   .layout,
   .layout.stack-below {
-    grid-template-columns: 250px minmax(0, 1fr);
+    grid-template-columns: var(--side-w, 250px) minmax(0, 1fr);
     grid-template-areas:
       "side editor"
       "side result";
