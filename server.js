@@ -214,6 +214,16 @@ function getConnectionFromEnv(platform, databaseKey = 'pampero') {
   }
 
   if (platform === 'mysql') {
+    if (databaseKey === 'library') {
+      return {
+        host: requireEnv('MYSQL_HOST'),
+        port: toInt(process.env.MYSQL_PORT, 3306),
+        database: process.env.MYSQL_LIBRARY_DATABASE || 'library',
+        user: requireEnv('MYSQL_USER'),
+        password: requireEnv('MYSQL_PASSWORD'),
+        ssl: String(process.env.MYSQL_SSL || 'true').toLowerCase() !== 'false'
+      };
+    }
     return {
       host: requireEnv('MYSQL_HOST'),
       port: toInt(process.env.MYSQL_PORT, 3306),
@@ -223,7 +233,16 @@ function getConnectionFromEnv(platform, databaseKey = 'pampero') {
       ssl: String(process.env.MYSQL_SSL || 'true').toLowerCase() !== 'false'
     };
   }
-
+  if (databaseKey === 'library') {
+    return {
+      host: requireEnv('POSTGRES_HOST'),
+      port: toInt(process.env.POSTGRES_PORT, 5432),
+      database: process.env.POSTGRES_LIBRARY_DATABASE || 'library',
+      user: requireEnv('POSTGRES_USER'),
+      password: requireEnv('POSTGRES_PASSWORD'),
+      ssl: String(process.env.POSTGRES_SSL || 'true').toLowerCase() !== 'false'
+    };
+  }
   return {
     host: requireEnv('POSTGRES_HOST'),
     port: toInt(process.env.POSTGRES_PORT, 5432),
