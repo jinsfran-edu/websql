@@ -41,6 +41,7 @@ La app usa únicamente conexiones predeterminadas por plataforma, configuradas p
 - `SQLSERVER_HOST`, `SQLSERVER_PORT`, `SQLSERVER_DATABASE`, `SQLSERVER_USER`, `SQLSERVER_PASSWORD`
 - `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_SSL`
 - `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DATABASE`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_SSL`
+- Base `library`: `SQLSERVER_LIBRARY_DATABASE`, `SQLSERVER_LIBRARY_USER`, `SQLSERVER_LIBRARY_PASSWORD` (obligatorios en SQL Server). En MySQL y PostgreSQL son opcionales `MYSQL_LIBRARY_DATABASE`/`_USER`/`_PASSWORD` y `POSTGRES_LIBRARY_DATABASE`/`_USER`/`_PASSWORD`; sin usuario propio se reutiliza el principal, que debería tener solo `SELECT` sobre `library`.
 
 ## Registro estadistico de consultas
 
@@ -106,7 +107,7 @@ Respuesta:
 ## Restricciones de ejecución
 
 - Solo se permite **una sentencia SQL por ejecución**.
-- Con `READ_ONLY_MODE=true`, solo se permiten sentencias de lectura (`SELECT`, `WITH`, `SHOW`, `DESCRIBE`, `DESC`, `EXPLAIN`).
+- Con `READ_ONLY_MODE=true`, solo se permiten sentencias de lectura (`SELECT`, `WITH`, `SHOW`, `DESCRIBE`, `DESC`, `EXPLAIN`). Se rechazan además las que contengan palabras de escritura fuera de textos y comentarios (`INSERT`, `UPDATE`, `DELETE`, `MERGE`, `INTO`, `DROP`, `CREATE`, `ALTER`, `TRUNCATE`, `GRANT`, `REVOKE`, `EXEC`, `EXECUTE`, `CALL`), para cubrir casos como `WITH ... DELETE` o `SELECT ... INTO`. Este filtro es una ayuda: la protección real son los permisos del usuario de base de datos.
 
 ## Seguridad
 

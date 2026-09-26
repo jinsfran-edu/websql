@@ -87,6 +87,32 @@ describe('isReadOnlyStatement', () => {
       assert.equal(isReadOnlyStatement(q), false, q);
     }
   });
+  test('escrituras escondidas detrás de SELECT o WITH rechazadas', () => {
+    for (const q of [
+      'WITH d AS (DELETE FROM t RETURNING *) SELECT * FROM d',
+      'WITH c AS (SELECT 1 x) DELETE FROM t',
+      'WITH c AS (SELECT 1 x) UPDATE t SET a = 1',
+      'SELECT * INTO copia FROM t',
+      "SELECT * FROM t INTO OUTFILE '/tmp/x'",
+      "SELECT 'x--', 1 INTO copia FROM t",
+      "SELECT 'a\\' INTO copia FROM t --'"
+    ]) {
+      assert.equal(isReadOnlyStatement(q), false, q);
+    }
+  });
+  test('palabras de escritura en textos, comentarios o identificadores no molestan', () => {
+    for (const q of [
+      "SELECT * FROM t WHERE titulo = 'delete from x'",
+      "SELECT 'it''s an update' FROM t",
+      'SELECT [update] FROM t',
+      'SELECT "insert" FROM t',
+      'SELECT `delete` FROM t',
+      'SELECT 1 -- drop table\nFROM t',
+      'SELECT /* insert */ updated_at, created_by FROM t'
+    ]) {
+      assert.equal(isReadOnlyStatement(q), true, q);
+    }
+  });
   test('keyword inicial insensible a mayúsculas/espacios', () => {
     assert.equal(getLeadingSqlKeyword('   select 1'), 'SELECT');
   });
