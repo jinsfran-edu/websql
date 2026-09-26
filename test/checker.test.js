@@ -51,10 +51,10 @@ describe('normalizeDatabaseKey / isDatabaseAvailable', () => {
     assert.equal(normalizeDatabaseKey('LIBRARY'), 'library');
     assert.equal(normalizeDatabaseKey('otra'), null);
   });
-  test('library solo en SQL Server', () => {
+  test('library disponible en los tres motores', () => {
     assert.equal(isDatabaseAvailable('library', 'sqlserver'), true);
-    assert.equal(isDatabaseAvailable('library', 'mysql'), false);
-    assert.equal(isDatabaseAvailable('library', 'postgresql'), false);
+    assert.equal(isDatabaseAvailable('library', 'mysql'), true);
+    assert.equal(isDatabaseAvailable('library', 'postgresql'), true);
     assert.equal(isDatabaseAvailable('pampero', 'mysql'), true);
   });
 });
