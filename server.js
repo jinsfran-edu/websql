@@ -35,8 +35,8 @@ const queryStatsLogPath = process.env.QUERY_STATS_LOG_PATH
 const adminKey = String(process.env.ADMIN_KEY || '');
 
 const sqlServerPoolPromises = new Map();
-let mysqlPool = null;
-let postgresPool = null;
+const mysqlPools = new Map();
+const postgresPools = new Map();
 let sqlServerWarmupPromise = null;
 let queryStatsDirReadyPromise = null;
 
@@ -424,9 +424,10 @@ async function warmSqlServerPoolIfEnabled() {
 }
 
 function getMySqlPool(connection) {
-  if (!mysqlPool) {
+  const poolKey = `${connection.database}:${connection.user}`;
+  if (!mysqlPools.has(poolKey)) {
     const poolMax = Math.max(1, toInt(process.env.MYSQL_POOL_MAX, 10));
-    mysqlPool = mysql.createPool({
+    mysqlPools.set(poolKey, mysql.createPool({
       host: connection.host,
       port: toInt(connection.port, 3306),
       user: connection.user,
@@ -439,17 +440,18 @@ function getMySqlPool(connection) {
       maxIdle: poolMax,
       idleTimeout: 30000,
       enableKeepAlive: true
-    });
+    }));
   }
 
-  return mysqlPool;
+  return mysqlPools.get(poolKey);
 }
 
 function getPostgreSqlPool(connection) {
-  if (!postgresPool) {
+  const poolKey = `${connection.database}:${connection.user}`;
+  if (!postgresPools.has(poolKey)) {
     const useSsl = connection.ssl !== false;
 
-    postgresPool = new Pool({
+    postgresPools.set(poolKey, new Pool({
       host: connection.host,
       port: toInt(connection.port, 5432),
       user: connection.user,
@@ -461,10 +463,10 @@ function getPostgreSqlPool(connection) {
       connectionTimeoutMillis: queryTimeoutMs,
       statement_timeout: queryTimeoutMs,
       query_timeout: queryTimeoutMs
-    });
+    }));
   }
 
-  return postgresPool;
+  return postgresPools.get(poolKey);
 }
 
 async function closePools() {
@@ -479,15 +481,15 @@ async function closePools() {
   }
   sqlServerPoolPromises.clear();
 
-  if (mysqlPool) {
-    closeTasks.push(mysqlPool.end().catch(() => null));
-    mysqlPool = null;
+  for (const pool of mysqlPools.values()) {
+    closeTasks.push(pool.end().catch(() => null));
   }
+  mysqlPools.clear();
 
-  if (postgresPool) {
-    closeTasks.push(postgresPool.end().catch(() => null));
-    postgresPool = null;
+  for (const pool of postgresPools.values()) {
+    closeTasks.push(pool.end().catch(() => null));
   }
+  postgresPools.clear();
 
   await Promise.all(closeTasks);
 }
