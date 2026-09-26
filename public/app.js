@@ -48,8 +48,8 @@ const schemaCache = {};
 
 const databasesByPlatform = {
   sqlserver: ['pampero', 'library'],
-  mysql: ['pampero'],
-  postgresql: ['pampero']
+  mysql: ['pampero', 'library'],
+  postgresql: ['pampero', 'library']
 };
 
 const defaultConnections = {
@@ -68,11 +68,21 @@ const defaultConnections = {
     database: 'pampero',
     user: 'unpazuser'
   },
+  'mysql:library': {
+    host: 'myjoi.mysql.database.azure.com',
+    database: 'library',
+    user: 'unpazuser'
+  },
   'postgresql:pampero': {
     host: 'pgjoi.postgres.database.azure.com',
     database: 'pampero',
     user: 'unpazuser'
-  }
+  },
+  'postgresql:library': {
+    host: 'pgjoi.postgres.database.azure.com',
+    database: 'library',
+    user: 'unpazuser'
+  }  
 };
 
 function currentConnectionKey() {
