@@ -75,6 +75,12 @@ describe('datos para mostrar', () => {
       { host: 'ms', port: 1433, database: 'pampero', user: 'u1' });
     assert.throws(() => resolveConnection(config, 'sqlserver', 'pampero', env), /SQLSERVER_PASSWORD/);
   });
+  test('usuario propio sin password: se puede mostrar pero no conectar', () => {
+    const custom = validateConfig({ databases: { a: { mysql: { user: 'x' } } } }, 'test');
+    assert.deepEqual(resolveConnection(custom, 'mysql', 'a', baseEnv, { includePassword: false }),
+      { host: 'my', port: 3306, database: 'a', user: 'x', ssl: true });
+    assert.throws(() => resolveConnection(custom, 'mysql', 'a', baseEnv), /password/);
+  });
 });
 
 describe('bases nuevas', () => {
