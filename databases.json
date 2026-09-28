@@ -22,6 +22,13 @@
         "user": "${POSTGRES_LIBRARY_USER:-}",
         "password": "${POSTGRES_LIBRARY_PASSWORD}"
       }
+    },
+    "sakila": {
+      "mysql": {
+        "database": "${MYSQL_SAKILA_DATABASE:-sakila}",
+        "user": "${MYSQL_SAKILA_USER:-}",
+        "password": "${MYSQL_SAKILA_PASSWORD}"
+      }
     }
   }
 }
