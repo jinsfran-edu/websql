@@ -35,10 +35,10 @@ describe('resolveEnvTemplate', () => {
 describe('databases.json (mismo comportamiento que antes)', () => {
   test('pampero y library en los tres motores, pampero por defecto', () => {
     assert.equal(config.defaultKey, 'pampero');
-    assert.deepEqual(platformsByDatabase(config), {
-      pampero: ['sqlserver', 'mysql', 'postgresql'],
-      library: ['sqlserver', 'mysql', 'postgresql']
-    });
+    // Solo pampero y library: agregar bases nuevas a databases.json no debe romper este test.
+    const platforms = platformsByDatabase(config);
+    assert.deepEqual(platforms.pampero, ['sqlserver', 'mysql', 'postgresql']);
+    assert.deepEqual(platforms.library, ['sqlserver', 'mysql', 'postgresql']);
   });
 
   test('pampero usa las variables principales de cada motor', () => {
