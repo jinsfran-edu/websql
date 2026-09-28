@@ -1,12 +1,17 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+
+// Antes de cargar sql-utils, que lee databases.json (DATABASES_CONFIG puede venir de .env).
+dotenv.config();
 const fs = require('fs/promises');
 const path = require('path');
 const sqlServer = require('mssql');
 const mysql = require('mysql2/promise');
 const { Pool } = require('pg');
 const {
+  databaseConfig,
+  defaultDatabaseKey,
   databasePlatforms,
   normalizePlatform,
   normalizeDatabaseKey,
@@ -19,8 +24,7 @@ const { detectAntipatterns, usesSelectStar } = require('./lib/antipatterns');
 const { compareExerciseResults } = require('./lib/exercise-checker');
 const { buildStats } = require('./lib/stats');
 const { explainSqlError } = require('./lib/error-hints');
-
-dotenv.config();
+const { resolveConnection } = require('./lib/databases');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -184,73 +188,8 @@ function getSqlServerServerElapsedMs(recordsets) {
   return toFixedMs(elapsedUs / 1000);
 }
 
-function requireEnv(name) {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-  return value;
-}
-
-function getConnectionFromEnv(platform, databaseKey = 'pampero') {
-  if (platform === 'sqlserver') {
-    if (databaseKey === 'library') {
-      return {
-        host: requireEnv('SQLSERVER_HOST'),
-        port: toInt(process.env.SQLSERVER_PORT, 1433),
-        database: process.env.SQLSERVER_LIBRARY_DATABASE || 'library',
-        user: requireEnv('SQLSERVER_LIBRARY_USER'),
-        password: requireEnv('SQLSERVER_LIBRARY_PASSWORD')
-      };
-    }
-
-    return {
-      host: requireEnv('SQLSERVER_HOST'),
-      port: toInt(process.env.SQLSERVER_PORT, 1433),
-      database: requireEnv('SQLSERVER_DATABASE'),
-      user: requireEnv('SQLSERVER_USER'),
-      password: requireEnv('SQLSERVER_PASSWORD')
-    };
-  }
-
-  if (platform === 'mysql') {
-    if (databaseKey === 'library') {
-      return {
-        host: requireEnv('MYSQL_HOST'),
-        port: toInt(process.env.MYSQL_PORT, 3306),
-        database: process.env.MYSQL_LIBRARY_DATABASE || 'library',
-        user: process.env.MYSQL_LIBRARY_USER || requireEnv('MYSQL_USER'),
-        password: process.env.MYSQL_LIBRARY_USER ? requireEnv('MYSQL_LIBRARY_PASSWORD') : requireEnv('MYSQL_PASSWORD'),
-        ssl: String(process.env.MYSQL_SSL || 'true').toLowerCase() !== 'false'
-      };
-    }
-    return {
-      host: requireEnv('MYSQL_HOST'),
-      port: toInt(process.env.MYSQL_PORT, 3306),
-      database: requireEnv('MYSQL_DATABASE'),
-      user: requireEnv('MYSQL_USER'),
-      password: requireEnv('MYSQL_PASSWORD'),
-      ssl: String(process.env.MYSQL_SSL || 'true').toLowerCase() !== 'false'
-    };
-  }
-  if (databaseKey === 'library') {
-    return {
-      host: requireEnv('POSTGRES_HOST'),
-      port: toInt(process.env.POSTGRES_PORT, 5432),
-      database: process.env.POSTGRES_LIBRARY_DATABASE || 'library',
-      user: process.env.POSTGRES_LIBRARY_USER || requireEnv('POSTGRES_USER'),
-      password: process.env.POSTGRES_LIBRARY_USER ? requireEnv('POSTGRES_LIBRARY_PASSWORD') : requireEnv('POSTGRES_PASSWORD'),
-      ssl: String(process.env.POSTGRES_SSL || 'true').toLowerCase() !== 'false'
-    };
-  }
-  return {
-    host: requireEnv('POSTGRES_HOST'),
-    port: toInt(process.env.POSTGRES_PORT, 5432),
-    database: requireEnv('POSTGRES_DATABASE'),
-    user: requireEnv('POSTGRES_USER'),
-    password: requireEnv('POSTGRES_PASSWORD'),
-    ssl: String(process.env.POSTGRES_SSL || 'true').toLowerCase() !== 'false'
-  };
+function getConnectionFromEnv(platform, databaseKey = defaultDatabaseKey) {
+  return resolveConnection(databaseConfig, platform, databaseKey);
 }
 
 async function runSqlServerQuery(connection, queryText) {
@@ -360,7 +299,7 @@ async function runPostgreSqlQuery(connection, queryText) {
 }
 
 async function getSqlServerPool(connection) {
-  const poolKey = `${connection.database}:${connection.user}`;
+  const poolKey = `${connection.host}:${connection.port}:${connection.database}:${connection.user}`;
 
   if (!sqlServerPoolPromises.has(poolKey)) {
     const poolMin = toInt(process.env.SQLSERVER_POOL_MIN, 1);
@@ -424,7 +363,7 @@ async function warmSqlServerPoolIfEnabled() {
 }
 
 function getMySqlPool(connection) {
-  const poolKey = `${connection.database}:${connection.user}`;
+  const poolKey = `${connection.host}:${connection.port}:${connection.database}:${connection.user}`;
   if (!mysqlPools.has(poolKey)) {
     const poolMax = Math.max(1, toInt(process.env.MYSQL_POOL_MAX, 10));
     mysqlPools.set(poolKey, mysql.createPool({
@@ -447,7 +386,7 @@ function getMySqlPool(connection) {
 }
 
 function getPostgreSqlPool(connection) {
-  const poolKey = `${connection.database}:${connection.user}`;
+  const poolKey = `${connection.host}:${connection.port}:${connection.database}:${connection.user}`;
   if (!postgresPools.has(poolKey)) {
     const useSsl = connection.ssl !== false;
 
@@ -624,7 +563,7 @@ try {
 
 const solutionResultCache = new Map();
 
-async function runQueryForPlatform(platform, queryText, databaseKey = 'pampero') {
+async function runQueryForPlatform(platform, queryText, databaseKey = defaultDatabaseKey) {
   const connection = getConnectionFromEnv(platform, databaseKey);
   if (platform === 'sqlserver') return runSqlServerQuery(connection, queryText);
   if (platform === 'mysql') return runMySqlQuery(connection, queryText);
@@ -634,7 +573,7 @@ async function runQueryForPlatform(platform, queryText, databaseKey = 'pampero')
 async function getSolutionResult(guide, exercise, platform) {
   const key = `${guide.id}:${exercise.id}:${platform}`;
   if (!solutionResultCache.has(key)) {
-    const result = await runQueryForPlatform(platform, exercise.solucion[platform], guide.database || 'pampero');
+    const result = await runQueryForPlatform(platform, exercise.solucion[platform], guide.database || defaultDatabaseKey);
     solutionResultCache.set(key, { columns: result.columns, rows: result.rows });
   }
   return solutionResultCache.get(key);
@@ -681,7 +620,7 @@ app.get('/api/exercises', (_req, res) => {
       id: guide.id,
       nombre: guide.nombre || guide.id,
       materia: guide.materia || '',
-      database: guide.database || 'pampero',
+      database: guide.database || defaultDatabaseKey,
       exercises: Array.from(guide.exercisesById.values()).map((exercise) => ({
         id: exercise.id,
         dificultad: exercise.dificultad,
@@ -741,7 +680,7 @@ app.post('/api/exercises/:guide/:id/check', async (req, res) => {
       return res.status(400).json({ error: 'Solo se permiten consultas de lectura en la verificación.' });
     }
 
-    const guideDatabase = guide.database || 'pampero';
+    const guideDatabase = guide.database || defaultDatabaseKey;
     const studentResult = await runQueryForPlatform(normalizedPlatform, queryText, guideDatabase);
 
     let solutionResult;
@@ -825,7 +764,7 @@ app.post('/api/exercises/:guide/:id/check', async (req, res) => {
 
     return res.status(500).json({
       error: error.message || 'Unexpected error checking exercise',
-      hint: await buildErrorHint(error, normalizedPlatform, 'pampero')
+      hint: await buildErrorHint(error, normalizedPlatform, (guidesById.get(guideId) || {}).database || defaultDatabaseKey)
     });
   }
 });
@@ -901,7 +840,7 @@ async function getSchemaTablesForHints(platform, databaseKey) {
 async function buildErrorHint(error, platform, databaseKey) {
   if (!platform || isQueryTimeoutError(error)) return null;
   try {
-    const tables = await getSchemaTablesForHints(platform, databaseKey || 'pampero');
+    const tables = await getSchemaTablesForHints(platform, databaseKey || defaultDatabaseKey);
     return explainSqlError(error.message, tables);
   } catch (_e) {
     return null;
@@ -932,9 +871,28 @@ app.get('/api/settings', (_req, res) => {
     sqlServerDiagnosticsEnabled,
     queryTimeoutMs,
     maxResultRows,
-    databases: databasePlatforms
+    defaultDatabase: defaultDatabaseKey,
+    databases: databasePlatforms,
+    connections: describeConnections()
   });
 });
+
+// Servidor, base y usuario de cada combinación, para mostrarlos en la interfaz
+// (nunca la contraseña). Las que no tienen sus variables definidas se omiten.
+function describeConnections() {
+  const result = {};
+  for (const [databaseKey, platforms] of Object.entries(databasePlatforms)) {
+    for (const platform of platforms) {
+      try {
+        const { host, database, user } = getConnectionFromEnv(platform, databaseKey);
+        result[`${platform}:${databaseKey}`] = { host, database, user };
+      } catch (_error) {
+        // Sin variables de entorno para esta combinación: no se muestra.
+      }
+    }
+  }
+  return result;
+}
 
 
 

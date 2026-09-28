@@ -46,44 +46,11 @@ let appSettings = { readOnlyMode: null };
 let editor = null;
 const schemaCache = {};
 
-const databasesByPlatform = {
-  sqlserver: ['pampero', 'library'],
-  mysql: ['pampero', 'library'],
-  postgresql: ['pampero', 'library']
-};
-
-const defaultConnections = {
-  'sqlserver:pampero': {
-    host: 'msjoi.database.windows.net',
-    database: 'pampero',
-    user: 'unpazuser'
-  },
-  'sqlserver:library': {
-    host: 'msjoi.database.windows.net',
-    database: 'library',
-    user: 'unpazuser2'
-  },
-  'mysql:pampero': {
-    host: 'myjoi.mysql.database.azure.com',
-    database: 'pampero',
-    user: 'unpazuser'
-  },
-  'mysql:library': {
-    host: 'myjoi.mysql.database.azure.com',
-    database: 'library',
-    user: 'unpazuser'
-  },
-  'postgresql:pampero': {
-    host: 'pgjoi.postgres.database.azure.com',
-    database: 'pampero',
-    user: 'unpazuser'
-  },
-  'postgresql:library': {
-    host: 'pgjoi.postgres.database.azure.com',
-    database: 'library',
-    user: 'unpazuser'
-  }  
-};
+// Bases por plataforma y datos de conexión: llegan de /api/settings
+// (definidos en databases.json del servidor).
+let defaultDatabase = 'pampero';
+let databasesByPlatform = null; // null hasta leer /api/settings
+let defaultConnections = {};
 
 function currentConnectionKey() {
   return `${platformEl.value}:${databaseEl.value}`;
@@ -91,7 +58,7 @@ function currentConnectionKey() {
 
 function updateDatabaseOptions() {
   const platform = platformEl.value;
-  const available = databasesByPlatform[platform] || ['pampero'];
+  const available = databasesByPlatform ? (databasesByPlatform[platform] || []) : [defaultDatabase];
   const previous = databaseEl.value;
 
   databaseEl.innerHTML = '';
@@ -102,8 +69,10 @@ function updateDatabaseOptions() {
     databaseEl.appendChild(option);
   }
 
-  databaseEl.value = available.includes(previous) ? previous : 'pampero';
-  databaseEl.disabled = available.length === 1;
+  databaseEl.value = available.includes(previous)
+    ? previous
+    : (available.includes(defaultDatabase) ? defaultDatabase : (available[0] || ''));
+  databaseEl.disabled = available.length <= 1;
 }
 
 const HISTORY_KEY = 'websql_query_history';
@@ -456,11 +425,11 @@ function loadHistory() {
 function saveToHistory(sql, platform, success, database) {
   const trimmed = String(sql || '').trim();
   if (!trimmed) return;
-  const db = database || 'pampero';
+  const db = database || defaultDatabase;
 
   let history = loadHistory();
   // Evitar duplicados de la misma consulta, plataforma y base
-  history = history.filter((item) => !(item.sql === trimmed && item.platform === platform && (item.database || 'pampero') === db));
+  history = history.filter((item) => !(item.sql === trimmed && item.platform === platform && (item.database || defaultDatabase) === db));
   history.unshift({ sql: trimmed, platform, database: db, success, ts: Date.now() });
   if (history.length > HISTORY_MAX) history = history.slice(0, HISTORY_MAX);
 
@@ -492,7 +461,7 @@ function renderHistory() {
     const itemEl = document.createElement('button');
     itemEl.type = 'button';
     itemEl.className = 'history-item' + (item.success ? '' : ' history-failed');
-    const dbLabel = (item.database || 'pampero') === 'pampero' ? '' : ` · ${escapeHtml(item.database)}`;
+    const dbLabel = (item.database || defaultDatabase) === defaultDatabase ? '' : ` · ${escapeHtml(item.database)}`;
     itemEl.innerHTML = `
       <span class="history-meta">${escapeHtml(item.platform)}${dbLabel} · ${formatHistoryTime(item.ts)}${item.success ? '' : ' · falló'}</span>
       <span class="history-sql">${escapeHtml(item.sql.length > 120 ? item.sql.slice(0, 120) + '…' : item.sql)}</span>
@@ -501,7 +470,7 @@ function renderHistory() {
     itemEl.addEventListener('click', () => {
       platformEl.value = item.platform;
       updateDatabaseOptions();
-      databaseEl.value = (databasesByPlatform[item.platform] || []).includes(item.database) ? item.database : 'pampero';
+      if ((databasesByPlatform?.[item.platform] || []).includes(item.database)) databaseEl.value = item.database;
       renderConnectionInfo();
       updateVerifyAvailability();
       if (editor) {
@@ -675,7 +644,7 @@ function closeExercise() {
 function updateVerifyAvailability() {
   if (!activeExercise) return;
   const guide = activeGuide();
-  const guideDatabase = (guide && guide.database) || 'pampero';
+  const guideDatabase = (guide && guide.database) || defaultDatabase;
   const platform = platformEl.value;
   const supported = (activeExercise.plataformas || []).includes(platform);
   const onGuideDb = databaseEl.value === guideDatabase;
@@ -786,10 +755,24 @@ async function loadSettings() {
     if (!response.ok) throw new Error('No se pudo leer la configuracion del servidor');
     const data = await response.json();
     appSettings = { readOnlyMode: Boolean(data.readOnlyMode) };
+    applyDatabaseSettings(data);
   } catch (_error) {
     appSettings = { readOnlyMode: null };
   }
+  updateDatabaseOptions();
   renderConnectionInfo();
+  updateVerifyAvailability();
+}
+
+function applyDatabaseSettings(data) {
+  if (data.defaultDatabase) defaultDatabase = data.defaultDatabase;
+  databasesByPlatform = {};
+  for (const [db, platforms] of Object.entries(data.databases || {})) {
+    for (const platform of platforms) {
+      (databasesByPlatform[platform] = databasesByPlatform[platform] || []).push(db);
+    }
+  }
+  defaultConnections = data.connections || {};
 }
 
 function renderRows(columns, rows) {
