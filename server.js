@@ -1,6 +1,9 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+
+// Antes de cargar sql-utils, que lee databases.json (DATABASES_CONFIG puede venir de .env).
+dotenv.config();
 const fs = require('fs/promises');
 const path = require('path');
 const sqlServer = require('mssql');
@@ -22,8 +25,6 @@ const { compareExerciseResults } = require('./lib/exercise-checker');
 const { buildStats } = require('./lib/stats');
 const { explainSqlError } = require('./lib/error-hints');
 const { resolveConnection } = require('./lib/databases');
-
-dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -298,7 +299,7 @@ async function runPostgreSqlQuery(connection, queryText) {
 }
 
 async function getSqlServerPool(connection) {
-  const poolKey = `${connection.database}:${connection.user}`;
+  const poolKey = `${connection.host}:${connection.port}:${connection.database}:${connection.user}`;
 
   if (!sqlServerPoolPromises.has(poolKey)) {
     const poolMin = toInt(process.env.SQLSERVER_POOL_MIN, 1);
@@ -362,7 +363,7 @@ async function warmSqlServerPoolIfEnabled() {
 }
 
 function getMySqlPool(connection) {
-  const poolKey = `${connection.database}:${connection.user}`;
+  const poolKey = `${connection.host}:${connection.port}:${connection.database}:${connection.user}`;
   if (!mysqlPools.has(poolKey)) {
     const poolMax = Math.max(1, toInt(process.env.MYSQL_POOL_MAX, 10));
     mysqlPools.set(poolKey, mysql.createPool({
@@ -385,7 +386,7 @@ function getMySqlPool(connection) {
 }
 
 function getPostgreSqlPool(connection) {
-  const poolKey = `${connection.database}:${connection.user}`;
+  const poolKey = `${connection.host}:${connection.port}:${connection.database}:${connection.user}`;
   if (!postgresPools.has(poolKey)) {
     const useSsl = connection.ssl !== false;
 
@@ -763,7 +764,7 @@ app.post('/api/exercises/:guide/:id/check', async (req, res) => {
 
     return res.status(500).json({
       error: error.message || 'Unexpected error checking exercise',
-      hint: await buildErrorHint(error, normalizedPlatform, defaultDatabaseKey)
+      hint: await buildErrorHint(error, normalizedPlatform, (guidesById.get(guideId) || {}).database || defaultDatabaseKey)
     });
   }
 });

@@ -49,7 +49,7 @@ const schemaCache = {};
 // Bases por plataforma y datos de conexión: llegan de /api/settings
 // (definidos en databases.json del servidor).
 let defaultDatabase = 'pampero';
-let databasesByPlatform = {};
+let databasesByPlatform = null; // null hasta leer /api/settings
 let defaultConnections = {};
 
 function currentConnectionKey() {
@@ -58,7 +58,7 @@ function currentConnectionKey() {
 
 function updateDatabaseOptions() {
   const platform = platformEl.value;
-  const available = databasesByPlatform[platform] || [defaultDatabase];
+  const available = databasesByPlatform ? (databasesByPlatform[platform] || []) : [defaultDatabase];
   const previous = databaseEl.value;
 
   databaseEl.innerHTML = '';
@@ -71,8 +71,8 @@ function updateDatabaseOptions() {
 
   databaseEl.value = available.includes(previous)
     ? previous
-    : (available.includes(defaultDatabase) ? defaultDatabase : available[0]);
-  databaseEl.disabled = available.length === 1;
+    : (available.includes(defaultDatabase) ? defaultDatabase : (available[0] || ''));
+  databaseEl.disabled = available.length <= 1;
 }
 
 const HISTORY_KEY = 'websql_query_history';
@@ -470,7 +470,7 @@ function renderHistory() {
     itemEl.addEventListener('click', () => {
       platformEl.value = item.platform;
       updateDatabaseOptions();
-      databaseEl.value = (databasesByPlatform[item.platform] || []).includes(item.database) ? item.database : defaultDatabase;
+      if ((databasesByPlatform?.[item.platform] || []).includes(item.database)) databaseEl.value = item.database;
       renderConnectionInfo();
       updateVerifyAvailability();
       if (editor) {

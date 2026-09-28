@@ -89,6 +89,8 @@ describe('bases nuevas', () => {
     assert.throws(() => validateConfig({ databases: { a: { oracle: {} } } }, 'x'), /motor desconocido/);
     assert.throws(() => validateConfig({ databases: { a: {} } }, 'x'), /ningún motor/);
     assert.throws(() => validateConfig({ default: 'b', databases: { a: { mysql: {} } } }, 'x'), /por defecto/);
+    assert.throws(() => validateConfig({ databases: { a: { mysql: { user: 'x', password: 'secreto' } } } }, 'x'), /variable de entorno/);
+    assert.throws(() => validateConfig({ databases: { a: { mysql: { user: 'x', password: '${P:-secreto}' } } } }, 'x'), /variable de entorno/);
     const sinPassword = validateConfig({ databases: { a: { mysql: { user: 'x' } } } }, 'x');
     assert.throws(() => resolveConnection(sinPassword, 'mysql', 'a', baseEnv), /password/);
   });
