@@ -878,16 +878,17 @@ app.get('/api/settings', (_req, res) => {
 });
 
 // Servidor, base y usuario de cada combinación, para mostrarlos en la interfaz
-// (nunca la contraseña). Las que no tienen sus variables definidas se omiten.
+// (nunca la contraseña). Si falta configuración, se informa el motivo.
 function describeConnections() {
   const result = {};
   for (const [databaseKey, platforms] of Object.entries(databasePlatforms)) {
     for (const platform of platforms) {
+      const key = `${platform}:${databaseKey}`;
       try {
-        const { host, database, user } = getConnectionFromEnv(platform, databaseKey);
-        result[`${platform}:${databaseKey}`] = { host, database, user };
-      } catch (_error) {
-        // Sin variables de entorno para esta combinación: no se muestra.
+        const { host, database, user } = resolveConnection(databaseConfig, platform, databaseKey, process.env, { includePassword: false });
+        result[key] = { host, database, user };
+      } catch (error) {
+        result[key] = { error: error.message.replace('Missing required environment variable:', 'falta la variable') };
       }
     }
   }
