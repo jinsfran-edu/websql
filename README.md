@@ -2,7 +2,7 @@
 
 Aplicación web para ejecutar consultas SQL en **SQL Server**, **MySQL** o **PostgreSQL** desde una sola interfaz.
 
-La app usa únicamente conexiones predeterminadas por plataforma, configuradas por variables de entorno. Hay dos bases disponibles en los tres motores, que se eligen desde el selector de la interfaz:
+La app usa únicamente conexiones predeterminadas por plataforma. Las bases disponibles se definen en [`databases.json`](databases.json) y las credenciales en variables de entorno (ver [Agregar una base de ejemplo](#agregar-una-base-de-ejemplo)). Hoy hay dos bases disponibles en los tres motores, que se eligen desde el selector de la interfaz:
 
 | Motor | Servidor | Base | Usuario |
 | --- | --- | --- | --- |
@@ -50,11 +50,43 @@ La app usa únicamente conexiones predeterminadas por plataforma, configuradas p
 - `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DATABASE`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_SSL`
 - Base `library`: `SQLSERVER_LIBRARY_DATABASE`, `SQLSERVER_LIBRARY_USER`, `SQLSERVER_LIBRARY_PASSWORD` (obligatorios en SQL Server). En MySQL y PostgreSQL son opcionales `MYSQL_LIBRARY_DATABASE`/`_USER`/`_PASSWORD` y `POSTGRES_LIBRARY_DATABASE`/`_USER`/`_PASSWORD`; sin usuario propio se reutiliza el principal, que debería tener solo `SELECT` sobre `library`.
 
+- `DATABASES_CONFIG` (opcional): ruta a otro archivo de bases en lugar de `databases.json`.
+
 ### Base `library`
 
 - SQL Server: `SQLSERVER_LIBRARY_DATABASE` (default `library`), `SQLSERVER_LIBRARY_USER`, `SQLSERVER_LIBRARY_PASSWORD`. Reutiliza `SQLSERVER_HOST` y `SQLSERVER_PORT`.
 - MySQL: `MYSQL_LIBRARY_DATABASE` (default `library`). Reutiliza host, puerto, usuario, contraseña y SSL de MySQL.
 - PostgreSQL: `POSTGRES_LIBRARY_DATABASE` (default `library`). Reutiliza host, puerto, usuario, contraseña y SSL de PostgreSQL.
+
+## Agregar una base de ejemplo
+
+Las bases se listan en `databases.json`; no hace falta tocar código. Cada base indica en qué motores existe, y la interfaz (selector, datos de conexión, explorador de esquema) se arma sola a partir de ese archivo.
+
+```json
+{
+  "default": "pampero",
+  "databases": {
+    "pampero": { "...": "..." },
+    "tienda": {
+      "mysql": {},
+      "postgresql": {},
+      "sqlserver": {
+        "user": "${SQLSERVER_TIENDA_USER}",
+        "password": "${SQLSERVER_TIENDA_PASSWORD}"
+      }
+    }
+  }
+}
+```
+
+- El nombre de la base (`tienda`) va en minúsculas y es lo que se ve en el selector y lo que usan las guías de ejercicios en `"database"`.
+- Una entrada vacía (`{}`) usa el servidor, puerto, usuario y contraseña principales del motor (`MYSQL_HOST`, `MYSQL_USER`, etc.) y una base con el mismo nombre.
+- Campos opcionales por motor: `database`, `user`, `password`, `host`, `port` y `ssl` (este último solo MySQL/PostgreSQL). Si se define `user`, también hay que definir `password`.
+- Los valores pueden leer variables de entorno: `${VAR}` es obligatoria (si falta, esa base da error al usarla) y `${VAR:-valor}` es opcional con valor por defecto. Si `user` queda vacío (por ejemplo `"${MYSQL_TIENDA_USER:-}"` sin definir), se usa el usuario principal del motor.
+- Las contraseñas van siempre en variables de entorno (en Azure, en la configuración de la Web App), nunca escritas en `databases.json`.
+- `default` es la base que se usa cuando no se indica ninguna.
+
+Después de editar el archivo hay que reiniciar la app (en Azure se reinicia sola al desplegar el push a `main`). Para que los alumnos solo puedan leer, el usuario de cada base nueva debería tener únicamente permisos de `SELECT`.
 
 ## Registro estadistico de consultas
 
@@ -94,7 +126,7 @@ Body JSON:
 ```json
 {
   "platform": "sqlserver | mysql | postgresql",
-  "database": "pampero | library",
+  "database": "pampero | library | (cualquier base de databases.json)",
   "query": "SELECT 1 AS ok;"
 }
 ```

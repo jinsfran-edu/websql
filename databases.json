@@ -1,0 +1,27 @@
+{
+  "default": "pampero",
+  "databases": {
+    "pampero": {
+      "sqlserver": { "database": "${SQLSERVER_DATABASE}" },
+      "mysql": { "database": "${MYSQL_DATABASE}" },
+      "postgresql": { "database": "${POSTGRES_DATABASE}" }
+    },
+    "library": {
+      "sqlserver": {
+        "database": "${SQLSERVER_LIBRARY_DATABASE:-library}",
+        "user": "${SQLSERVER_LIBRARY_USER}",
+        "password": "${SQLSERVER_LIBRARY_PASSWORD}"
+      },
+      "mysql": {
+        "database": "${MYSQL_LIBRARY_DATABASE:-library}",
+        "user": "${MYSQL_LIBRARY_USER:-}",
+        "password": "${MYSQL_LIBRARY_PASSWORD}"
+      },
+      "postgresql": {
+        "database": "${POSTGRES_LIBRARY_DATABASE:-library}",
+        "user": "${POSTGRES_LIBRARY_USER:-}",
+        "password": "${POSTGRES_LIBRARY_PASSWORD}"
+      }
+    }
+  }
+}
