@@ -333,9 +333,14 @@ function escapeHtml(value) {
 function renderConnectionInfo() {
   const key = currentConnectionKey();
   const info = defaultConnections[key];
-  connectionInfoEl.textContent = info
-    ? `Servidor: ${info.host} | Base: ${info.database} | Usuario: ${info.user}`
-    : '';
+  if (info && !info.error) {
+    connectionInfoEl.textContent = `Servidor: ${info.host} | Base: ${info.database} | Usuario: ${info.user}`;
+  } else if (databaseEl.value) {
+    // Sin datos del servidor (todavía no cargaron o falta configuración): al menos la base.
+    connectionInfoEl.textContent = `Base: ${databaseEl.value}${info && info.error ? ` | ${info.error}` : ''}`;
+  } else {
+    connectionInfoEl.textContent = '';
+  }
   renderSchemaExplorer();
   prefetchSchema(platformEl.value, databaseEl.value).then(() => {
     if (currentConnectionKey() === key) renderSchemaExplorer();

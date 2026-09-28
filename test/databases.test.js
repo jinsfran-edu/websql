@@ -68,6 +68,15 @@ describe('databases.json (mismo comportamiento que antes)', () => {
   });
 });
 
+describe('datos para mostrar', () => {
+  test('sin contraseña no hace falta la variable de la contraseña', () => {
+    const env = { ...baseEnv, SQLSERVER_PASSWORD: '' };
+    assert.deepEqual(resolveConnection(config, 'sqlserver', 'pampero', env, { includePassword: false }),
+      { host: 'ms', port: 1433, database: 'pampero', user: 'u1' });
+    assert.throws(() => resolveConnection(config, 'sqlserver', 'pampero', env), /SQLSERVER_PASSWORD/);
+  });
+});
+
 describe('bases nuevas', () => {
   test('una entrada vacía usa el nombre de la base y el usuario del motor', () => {
     const custom = validateConfig({ databases: { tienda: { mysql: {} } } }, 'test');
